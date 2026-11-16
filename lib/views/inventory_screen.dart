@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/inventory_item.dart';
 import '../viewmodels/inventory_viewmodel.dart';
+import 'diagnostics_sheet.dart';
 
 class InventoryScreen extends StatelessWidget {
   const InventoryScreen({super.key});
@@ -14,6 +15,13 @@ class InventoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Stock Inventory'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: 'Break Logs & Diagnostics',
+            onPressed: () => DiagnosticsSheet.show(context),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(

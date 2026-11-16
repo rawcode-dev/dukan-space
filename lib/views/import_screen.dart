@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/import_viewmodel.dart';
+import 'diagnostics_sheet.dart';
 
 class ImportScreen extends StatelessWidget {
   const ImportScreen({super.key});
@@ -13,6 +14,13 @@ class ImportScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Import Catalog'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: 'Break Logs & Diagnostics',
+            onPressed: () => DiagnosticsSheet.show(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),

@@ -1,6 +1,7 @@
 import 'dart:isolate';
 import 'package:excel/excel.dart';
 import '../models/phone_model.dart';
+import 'diagnostic_service.dart';
 
 class ExcelParseResult {
   final List<PhoneModel> phoneModels;
@@ -21,8 +22,14 @@ class ExcelParserService {
   /// This prevents budget devices (with 2GB-3GB RAM) from dropping UI frames or triggering ANRs.
   Future<ExcelParseResult> parseExcelBytes(List<int> bytes) async {
     try {
-      return await Isolate.run(() => _parseExcelInBackground(bytes));
-    } catch (e) {
+      final result = await Isolate.run(() => _parseExcelInBackground(bytes));
+      DiagnosticService.instance.logInfo(
+        'ExcelParser',
+        'Parsed ${result.phoneModels.length} models (${result.totalRowsParsed} rows, ${result.skippedRows} skipped)',
+      );
+      return result;
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('ExcelParser', 'Parsing failed: ${e.toString()}', e, stack);
       return ExcelParseResult(
         phoneModels: [],
         totalRowsParsed: 0,

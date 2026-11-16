@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../services/diagnostic_service.dart';
 
 class DBProvider {
   DBProvider._internal();
@@ -37,12 +38,15 @@ class DBProvider {
         } catch (_) {
           // Fallback gracefully on devices that don't support custom PRAGMAs
         }
+        DiagnosticService.instance.logInfo('Database', 'Database opened at version $_databaseVersion');
       },
       onCreate: (db, version) async {
         await _createTables(db);
+        DiagnosticService.instance.logInfo('Database', 'Database tables created at version $version');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         await _createTables(db);
+        DiagnosticService.instance.logInfo('Database', 'Database upgraded from $oldVersion to $newVersion');
       },
     );
   }

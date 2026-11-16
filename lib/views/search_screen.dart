@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/search_viewmodel.dart';
 import '../services/search_service.dart';
+import 'diagnostics_sheet.dart';
 
 class SearchScreen extends StatelessWidget {
   const SearchScreen({super.key});
@@ -13,6 +14,13 @@ class SearchScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search Compatibility'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bug_report_outlined),
+            tooltip: 'Break Logs & Diagnostics',
+            onPressed: () => DiagnosticsSheet.show(context),
+          ),
+        ],
       ),
       body: Column(
         children: [

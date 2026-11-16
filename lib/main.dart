@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'database/db_provider.dart';
 import 'database/inventory_repository.dart';
+import 'services/diagnostic_service.dart';
 import 'services/excel_parser_service.dart';
 import 'services/search_service.dart';
 import 'viewmodels/import_viewmodel.dart';
@@ -13,6 +15,26 @@ import 'views/main_navigation_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize diagnostic break log system
+  await DiagnosticService.instance.init();
+
+  // Catch Flutter UI and widget tree break errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    DiagnosticService.instance.logError(
+      'FlutterError',
+      details.exceptionAsString(),
+      details.stack,
+    );
+    FlutterError.presentError(details);
+  };
+
+  // Catch asynchronous platform & isolate errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    DiagnosticService.instance.logError('PlatformAsyncError', error.toString(), stack);
+    return true;
+  };
+
   runApp(const DukanSpaceApp());
 }
 
@@ -32,6 +54,7 @@ class DukanSpaceApp extends StatelessWidget {
         Provider<InventoryRepository>.value(value: inventoryRepo),
         Provider<SearchService>.value(value: searchService),
         Provider<ExcelParserService>.value(value: excelParserService),
+        Provider<DiagnosticService>.value(value: DiagnosticService.instance),
         ChangeNotifierProvider<SearchViewModel>(
           create: (_) => SearchViewModel(searchService: searchService),
         ),
@@ -66,4 +89,3 @@ class DukanSpaceApp extends StatelessWidget {
     );
   }
 }
-
