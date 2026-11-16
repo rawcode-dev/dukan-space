@@ -33,8 +33,14 @@ jobs:
 
       - name: Ensure Android Wrapper
         run: |
-          if [ ! -f "android/gradlew" ]; then
-            flutter create . --platforms=android --org=com.dukanspace
+          cd android
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            gradle wrapper || true
+          fi
+          chmod +x gradlew || true
+          cd ..
+          if [ ! -f "android/gradle/wrapper/gradle-wrapper.jar" ]; then
+            flutter create . --project-name accessory_inventory --platforms=android --org=com.dukanspace
           fi
 
       - name: Install Dependencies
