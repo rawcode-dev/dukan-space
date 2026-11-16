@@ -79,15 +79,7 @@ class InventoryViewModel extends ChangeNotifier {
   Future<bool> saveOrUpdateItem(InventoryItem item) async {
     _errorMessage = null;
 
-    // Auto-resolve group ID if empty but model name matches catalog
-    var itemToSave = item;
-    if (itemToSave.accessoryGroupId.trim().isEmpty && itemToSave.modelName.trim().isNotEmpty) {
-      final autoGroup = await findAutoGroup(itemToSave.modelName);
-      if (autoGroup != null && autoGroup.isNotEmpty) {
-        itemToSave = itemToSave.copyWith(accessoryGroupId: autoGroup);
-        DiagnosticService.instance.logInfo('INVENTORY_VM', 'Auto-resolved Group "${autoGroup}" for model "${itemToSave.modelName}"');
-      }
-    }
+    final itemToSave = item;
 
     DiagnosticService.instance.logAction(
       'INVENTORY_VM',

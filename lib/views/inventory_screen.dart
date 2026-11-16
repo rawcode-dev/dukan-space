@@ -251,7 +251,8 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
   final _boxController = TextEditingController();
   final _stockController = TextEditingController();
 
-  String? _autoDetectedGroupHint;
+  String? _suggestedGroup;
+  List<String> _suggestedGroupModels = [];
   int _stockCount = 1;
   bool _isSaving = false;
 
@@ -282,7 +283,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     // Group setup
     _groupController.text = item?.accessoryGroupId ?? '';
     if (item != null && item.accessoryGroupId.isNotEmpty) {
-      _autoDetectedGroupHint = 'Existing Group: ${item.accessoryGroupId}';
+      _suggestedGroup = item.accessoryGroupId;
     }
 
     // Stock count
@@ -304,25 +305,38 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
   Future<void> _checkAutoGroup(String modelName) async {
     final clean = modelName.trim();
     if (clean.isEmpty) {
-      setState(() => _autoDetectedGroupHint = null);
+      if (mounted) {
+        setState(() {
+          _suggestedGroup = null;
+          _suggestedGroupModels = [];
+        });
+      }
       return;
     }
 
     final vm = widget.parentContext.read<InventoryViewModel>();
-    final autoGroup = await vm.findAutoGroup(clean);
+    final matchedGroup = await vm.findAutoGroup(clean);
 
-    if (mounted) {
-      setState(() {
-        if (autoGroup != null && autoGroup.isNotEmpty) {
-          _autoDetectedGroupHint = '✨ Auto-detected Catalog Group: $autoGroup';
-          // Auto-fill Group field if currently empty
-          if (_groupController.text.trim().isEmpty) {
-            _groupController.text = autoGroup;
-          }
-        } else {
-          _autoDetectedGroupHint = 'ℹ️ Standalone item (No matching catalog group found)';
-        }
-      });
+    if (!mounted) return;
+
+    if (matchedGroup != null && matchedGroup.isNotEmpty) {
+      final repo = widget.parentContext.read<InventoryRepository>();
+      final models = await repo.getCompatibleModelsForGroup(matchedGroup);
+      if (mounted) {
+        setState(() {
+          _suggestedGroup = matchedGroup;
+          _suggestedGroupModels = models;
+          // CRITICAL: We do NOT auto-assign _groupController.text!
+          // We only suggest it. The user must click the "Confirm Group" button to confirm.
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _suggestedGroup = null;
+          _suggestedGroupModels = [];
+        });
+      }
     }
   }
 
@@ -383,6 +397,10 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
                   controller.addListener(() {
                     if (_modelController.text != controller.text) {
                       _modelController.text = controller.text;
+                    }
+                  });
+                  focusNode.addListener(() {
+                    if (!focusNode.hasFocus) {
                       _checkAutoGroup(controller.text);
                     }
                   });
@@ -403,20 +421,6 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
                   );
                 },
               ),
-              if (_autoDetectedGroupHint != null) ...[
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4.0),
-                  child: Text(
-                    _autoDetectedGroupHint!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _autoDetectedGroupHint!.startsWith('✨') ? Colors.teal : Colors.blueGrey,
-                    ),
-                  ),
-                ),
-              ],
               const SizedBox(height: 14),
 
               // 2. Category / Item Type (Dropdown)
@@ -449,14 +453,110 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
               ],
               const SizedBox(height: 14),
 
-              // 3. Accessory Group ID (OPTIONAL!)
+              // 3. Interactive Group Suggestion (Suggest only, user clicks once to confirm)
+              if (_suggestedGroup != null && _groupController.text.trim() != _suggestedGroup) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withOpacity(0.45),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.colorScheme.primary.withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline, color: theme.colorScheme.primary, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Suggested Group: $_suggestedGroup',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                                fontSize: 13,
+                              ),
+                            ),
+                            if (_suggestedGroupModels.isNotEmpty)
+                              Text(
+                                'Shares accessories with: ${_suggestedGroupModels.take(3).join(", ")}${_suggestedGroupModels.length > 3 ? " +${_suggestedGroupModels.length - 3} more" : ""}',
+                                style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _groupController.text = _suggestedGroup!;
+                          });
+                        },
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check, size: 16),
+                            SizedBox(width: 4),
+                            Text('Confirm Group', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (_suggestedGroup != null && _groupController.text.trim() == _suggestedGroup) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.teal.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_outline, color: Colors.teal.shade700, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Confirmed Group: $_suggestedGroup',
+                          style: TextStyle(color: Colors.teal.shade900, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _groupController.clear();
+                          });
+                        },
+                        child: const Text('Unlink Group', style: TextStyle(fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              // 4. Accessory Group ID (OPTIONAL!)
               TextFormField(
                 controller: _groupController,
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   labelText: 'Accessory Group ID (Optional)',
-                  hintText: 'e.g. GRP-IP13 (leave empty for auto-group or standalone)',
-                  helperText: 'Auto-detected from phone models. Optional for standalone items.',
+                  hintText: 'e.g. GRP-IP13 (leave empty for standalone item)',
+                  helperText: 'Optional. Leave empty for standalone item without a group.',
                   prefixIcon: const Icon(Icons.tag),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.hub_outlined, size: 20),

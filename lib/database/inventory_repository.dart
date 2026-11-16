@@ -32,41 +32,27 @@ class InventoryRepository {
     }
   }
 
-  /// Looks up whether a phone model exists in the catalog and auto-resolves its group ID
+  /// Looks up whether an exact phone model exists in the catalog and returns its group ID.
+  /// Uses strict exact matching (trimmed and case-insensitive) to prevent accidental
+  /// cross-series grouping (e.g. iPhone 17 must NOT match iPhone 14 group).
   Future<String?> findGroupIdForModel(String modelName) async {
     final clean = modelName.trim().toLowerCase();
     if (clean.isEmpty) return null;
     try {
       final db = await _dbProvider.database;
 
-      // 1. Try exact match
+      // Strict exact match only: phone_name equals modelName (case-insensitive)
       final exact = await db.query(
         DBProvider.tablePhoneModels,
         columns: ['accessory_group_id'],
-        where: 'LOWER(phone_name) = ?',
+        where: 'LOWER(TRIM(phone_name)) = ?',
         whereArgs: [clean],
         limit: 1,
       );
       if (exact.isNotEmpty) {
         final gid = exact.first['accessory_group_id'] as String?;
         if (gid != null && gid.trim().isNotEmpty) {
-          DiagnosticService.instance.logInfo('DB_REPO', 'Exact auto-group match: "$modelName" -> "$gid"');
-          return gid.trim();
-        }
-      }
-
-      // 2. Try partial/like match
-      final partial = await db.query(
-        DBProvider.tablePhoneModels,
-        columns: ['accessory_group_id'],
-        where: 'LOWER(phone_name) LIKE ?',
-        whereArgs: ['%$clean%'],
-        limit: 1,
-      );
-      if (partial.isNotEmpty) {
-        final gid = partial.first['accessory_group_id'] as String?;
-        if (gid != null && gid.trim().isNotEmpty) {
-          DiagnosticService.instance.logInfo('DB_REPO', 'Partial auto-group match: "$modelName" -> "$gid"');
+          DiagnosticService.instance.logInfo('DB_REPO', 'Exact group match found: "$modelName" -> "$gid"');
           return gid.trim();
         }
       }

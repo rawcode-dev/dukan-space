@@ -35,3 +35,4 @@ class AccessoryGroup {
   @override
   int get hashCode => groupId.hashCode;
 }
+
