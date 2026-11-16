@@ -572,13 +572,7 @@ class _GroupEditorSheetState extends State<_GroupEditorSheet> {
   }
 
   Future<void> _handleSave() async {
-    final newGid = _groupIdController.text.trim();
-    if (newGid.isEmpty) {
-      setState(() {
-        _error = 'Please enter a Group ID (e.g. GRP-IP14).';
-      });
-      return;
-    }
+    final rawGid = _groupIdController.text.trim();
 
     // Include any text currently in the model input if user didn't press Add
     if (_modelInputController.text.trim().isNotEmpty) {
@@ -593,16 +587,16 @@ class _GroupEditorSheetState extends State<_GroupEditorSheet> {
     final groupVm = context.read<GroupViewModel>();
     final invVm = context.read<InventoryViewModel>();
 
-    final success = await groupVm.saveGroup(
+    final savedGid = await groupVm.saveGroup(
       oldGroupId: widget.existingGroup?.groupId,
-      newGroupId: newGid,
+      newGroupId: rawGid,
       phoneModels: _models,
       updateInventory: _updateInventory,
     );
 
     if (!mounted) return;
 
-    if (success) {
+    if (savedGid != null) {
       // Refresh inventory VM so autocomplete and filters update
       invVm.loadInventory();
       Navigator.of(context).pop();
@@ -610,8 +604,8 @@ class _GroupEditorSheetState extends State<_GroupEditorSheet> {
         SnackBar(
           content: Text(
             widget.existingGroup != null
-                ? 'Group "$newGid" updated successfully'
-                : 'Group "$newGid" created successfully with ${_models.length} model(s)',
+                ? 'Group "$savedGid" updated successfully'
+                : 'Group "$savedGid" created successfully with ${_models.length} model(s)',
           ),
           backgroundColor: Colors.teal.shade800,
         ),
@@ -719,16 +713,16 @@ class _GroupEditorSheetState extends State<_GroupEditorSheet> {
                     const SizedBox(height: 16),
                   ],
 
-                  // Group ID field
+                  // Group ID field (Optional - auto-generated if left empty)
                   TextField(
                     controller: _groupIdController,
                     textCapitalization: TextCapitalization.characters,
                     decoration: InputDecoration(
-                      labelText: 'Group ID / Tag *',
-                      hintText: 'e.g. GRP-IP14 or TG-SAM-A15',
+                      labelText: 'Group ID / Tag (Optional)',
+                      hintText: 'e.g. GRP-IP14 (Leave empty for auto-name)',
                       prefixIcon: const Icon(Icons.tag),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      helperText: 'A unique identifier for accessories sharing this shape/size',
+                      helperText: 'Optional. Leave blank to auto-generate a unique group name.',
                     ),
                   ),
 

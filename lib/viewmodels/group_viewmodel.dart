@@ -67,38 +67,31 @@ class GroupViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> saveGroup({
+  Future<String?> saveGroup({
     String? oldGroupId,
     required String newGroupId,
     required List<String> phoneModels,
     bool updateInventory = true,
   }) async {
-    final cleanGid = newGroupId.trim();
-    if (cleanGid.isEmpty) {
-      _errorMessage = 'Group ID cannot be empty.';
-      notifyListeners();
-      return false;
-    }
-
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      await _repository.createOrUpdateGroup(
+      final savedGid = await _repository.createOrUpdateGroup(
         oldGroupId: oldGroupId,
-        newGroupId: cleanGid,
+        newGroupId: newGroupId.trim(),
         phoneModels: phoneModels,
         updateInventory: updateInventory,
       );
       await loadGroups();
-      return true;
+      return savedGid;
     } catch (e, stack) {
-      _errorMessage = 'Failed to save group "$cleanGid": $e';
+      _errorMessage = 'Failed to save group: $e';
       DiagnosticService.instance.logError('GROUP_VM', 'saveGroup error', e, stack);
       _isLoading = false;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 

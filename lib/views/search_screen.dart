@@ -203,7 +203,9 @@ class SearchScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'Shelf: ${item.shelfNo}   •   Box: ${item.boxNo}',
+                    item.boxNo.trim().isNotEmpty
+                        ? 'Shelf: ${item.shelfNo}   •   Box: ${item.boxNo}'
+                        : 'Shelf: ${item.shelfNo}',
                     style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade800),
                   ),
                 ),

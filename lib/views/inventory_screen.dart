@@ -146,7 +146,9 @@ class InventoryScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Shelf: ${item.shelfNo}   •   Box: ${item.boxNo}',
+                    item.boxNo.trim().isNotEmpty
+                        ? 'Shelf: ${item.shelfNo}   •   Box: ${item.boxNo}'
+                        : 'Shelf: ${item.shelfNo}',
                     style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
                   ),
                 ],
@@ -555,13 +557,12 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
                           controller: controller,
                           focusNode: focusNode,
                           decoration: InputDecoration(
-                            labelText: 'Box / Tray / Bin',
-                            hintText: 'e.g. B-1, Box 12, Tray 3...',
+                            labelText: 'Box / Bin (Optional)',
+                            hintText: 'e.g. B-1, Box 12 (optional)',
                             prefixIcon: const Icon(Icons.inbox_outlined, size: 20),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                           onFieldSubmitted: (v) => onFieldSubmitted(),
                         );
                       },

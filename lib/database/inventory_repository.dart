@@ -484,16 +484,52 @@ class InventoryRepository {
     }
   }
 
-  /// Creates a new group or updates an existing group with its phone models
-  Future<void> createOrUpdateGroup({
+  /// Generates a clean, unique group ID if none is provided by user
+  Future<String> generateUniqueGroupId(List<String> phoneModels) async {
+    final db = await _dbProvider.database;
+    String base;
+    if (phoneModels.isNotEmpty && phoneModels.first.trim().isNotEmpty) {
+      final sanitized = phoneModels.first
+          .trim()
+          .replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '')
+          .replaceAll(RegExp(r'\s+'), '-')
+          .toUpperCase();
+      base = 'GRP-$sanitized';
+    } else {
+      final rand = (DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0');
+      base = 'GRP-$rand';
+    }
+
+    String candidate = base;
+    int counter = 1;
+    while (true) {
+      final existing = await db.query(
+        DBProvider.tablePhoneModels,
+        columns: ['accessory_group_id'],
+        where: 'LOWER(accessory_group_id) = ?',
+        whereArgs: [candidate.toLowerCase()],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        break;
+      }
+      counter++;
+      candidate = '$base-$counter';
+    }
+    return candidate;
+  }
+
+  /// Creates a new group or updates an existing group with its phone models.
+  /// If [newGroupId] is empty, a clean unique group ID is automatically generated.
+  Future<String> createOrUpdateGroup({
     String? oldGroupId,
     required String newGroupId,
     required List<String> phoneModels,
     bool updateInventory = true,
   }) async {
-    final cleanNewGid = newGroupId.trim();
+    var cleanNewGid = newGroupId.trim();
     if (cleanNewGid.isEmpty) {
-      throw ArgumentError('Group ID cannot be empty');
+      cleanNewGid = await generateUniqueGroupId(phoneModels);
     }
 
     final cleanOldGid = oldGroupId?.trim();
@@ -555,6 +591,7 @@ class InventoryRepository {
       });
 
       DiagnosticService.instance.logInfo('DB_REPO', 'createOrUpdateGroup succeeded: "$cleanNewGid" with ${phoneModels.length} models');
+      return cleanNewGid;
     } catch (e, stack) {
       DiagnosticService.instance.logError('DB_REPO', 'createOrUpdateGroup failed for "$cleanNewGid"', e, stack);
       rethrow;

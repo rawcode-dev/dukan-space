@@ -13,7 +13,7 @@ class InventoryItem {
     this.accessoryGroupId = '',
     required this.itemType,
     required this.shelfNo,
-    required this.boxNo,
+    this.boxNo = '',
     required this.stockCount,
   });
 
