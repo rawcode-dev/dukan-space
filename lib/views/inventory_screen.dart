@@ -232,23 +232,13 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     'Custom...',
   ];
 
-  static const List<String> _predefinedShelves = [
-    'S-01', 'S-02', 'S-03', 'S-04', 'S-05', 'S-06', 'S-07', 'S-08', 'Custom...',
-  ];
-
-  static const List<String> _predefinedBoxes = [
-    'B-01', 'B-02', 'B-03', 'B-04', 'B-05', 'B-06', 'B-07', 'B-08', 'Custom...',
-  ];
-
   late String _selectedItemType;
-  late String _selectedShelf;
-  late String _selectedBox;
 
   final _modelController = TextEditingController();
   final _customTypeController = TextEditingController();
   final _groupController = TextEditingController();
-  final _customShelfController = TextEditingController();
-  final _customBoxController = TextEditingController();
+  final _shelfController = TextEditingController();
+  final _boxController = TextEditingController();
   final _stockController = TextEditingController();
 
   String? _autoDetectedGroupHint;
@@ -275,29 +265,9 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
       _selectedItemType = _predefinedItemTypes.first;
     }
 
-    // Shelf setup
-    if (item != null && item.shelfNo.isNotEmpty) {
-      if (_predefinedShelves.contains(item.shelfNo)) {
-        _selectedShelf = item.shelfNo;
-      } else {
-        _selectedShelf = 'Custom...';
-        _customShelfController.text = item.shelfNo;
-      }
-    } else {
-      _selectedShelf = _predefinedShelves.first;
-    }
-
-    // Box setup
-    if (item != null && item.boxNo.isNotEmpty) {
-      if (_predefinedBoxes.contains(item.boxNo)) {
-        _selectedBox = item.boxNo;
-      } else {
-        _selectedBox = 'Custom...';
-        _customBoxController.text = item.boxNo;
-      }
-    } else {
-      _selectedBox = _predefinedBoxes.first;
-    }
+    // Shelf & Box setup (Custom user inputs)
+    _shelfController.text = item?.shelfNo ?? '';
+    _boxController.text = item?.boxNo ?? '';
 
     // Group setup
     _groupController.text = item?.accessoryGroupId ?? '';
@@ -315,8 +285,8 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     _modelController.dispose();
     _customTypeController.dispose();
     _groupController.dispose();
-    _customShelfController.dispose();
-    _customBoxController.dispose();
+    _shelfController.dispose();
+    _boxController.dispose();
     _stockController.dispose();
     super.dispose();
   }
@@ -483,77 +453,71 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
               ),
               const SizedBox(height: 14),
 
-              // 4. Shelf and Box (Dropdowns with Custom option)
+              // 4. Shelf and Box (Custom direct user input with autocomplete suggestions)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Column(
-                      children: [
-                        DropdownButtonFormField<String>(
-                          value: _selectedShelf,
+                    child: Autocomplete<String>(
+                      initialValue: TextEditingValue(text: _shelfController.text),
+                      optionsBuilder: (TextEditingValue textVal) {
+                        if (textVal.text.trim().isEmpty) return const Iterable<String>.empty();
+                        final query = textVal.text.toLowerCase();
+                        return vm.existingShelves.where((s) => s.toLowerCase().contains(query)).take(5);
+                      },
+                      onSelected: (String selection) {
+                        _shelfController.text = selection;
+                      },
+                      fieldViewBuilder: (ctx, controller, focusNode, onFieldSubmitted) {
+                        controller.addListener(() {
+                          _shelfController.text = controller.text;
+                        });
+                        return TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
                           decoration: InputDecoration(
-                            labelText: 'Shelf No.',
+                            labelText: 'Shelf / Rack Location',
+                            hintText: 'e.g. S-1, Rack A, Top Drawer...',
+                            prefixIcon: const Icon(Icons.shelves, size: 20),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           ),
-                          items: {
-                            ..._predefinedShelves,
-                            ...vm.existingShelves,
-                            'Custom...',
-                          }.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => _selectedShelf = val);
-                          },
-                        ),
-                        if (_selectedShelf == 'Custom...') ...[
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _customShelfController,
-                            decoration: InputDecoration(
-                              labelText: 'Custom Shelf',
-                              hintText: 'e.g. S-99',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                          ),
-                        ],
-                      ],
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          onFieldSubmitted: (v) => onFieldSubmitted(),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      children: [
-                        DropdownButtonFormField<String>(
-                          value: _selectedBox,
+                    child: Autocomplete<String>(
+                      initialValue: TextEditingValue(text: _boxController.text),
+                      optionsBuilder: (TextEditingValue textVal) {
+                        if (textVal.text.trim().isEmpty) return const Iterable<String>.empty();
+                        final query = textVal.text.toLowerCase();
+                        return vm.existingBoxes.where((b) => b.toLowerCase().contains(query)).take(5);
+                      },
+                      onSelected: (String selection) {
+                        _boxController.text = selection;
+                      },
+                      fieldViewBuilder: (ctx, controller, focusNode, onFieldSubmitted) {
+                        controller.addListener(() {
+                          _boxController.text = controller.text;
+                        });
+                        return TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
                           decoration: InputDecoration(
-                            labelText: 'Box No.',
+                            labelText: 'Box / Tray / Bin',
+                            hintText: 'e.g. B-1, Box 12, Tray 3...',
+                            prefixIcon: const Icon(Icons.inbox_outlined, size: 20),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                           ),
-                          items: {
-                            ..._predefinedBoxes,
-                            ...vm.existingBoxes,
-                            'Custom...',
-                          }.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => _selectedBox = val);
-                          },
-                        ),
-                        if (_selectedBox == 'Custom...') ...[
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _customBoxController,
-                            decoration: InputDecoration(
-                              labelText: 'Custom Box',
-                              hintText: 'e.g. B-99',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                          ),
-                        ],
-                      ],
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          onFieldSubmitted: (v) => onFieldSubmitted(),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -640,15 +604,9 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     // Resolve Group ID (Optional)
     final finalGroup = _groupController.text.trim();
 
-    // Resolve Shelf
-    final finalShelf = _selectedShelf == 'Custom...'
-        ? _customShelfController.text.trim()
-        : _selectedShelf.trim();
-
-    // Resolve Box
-    final finalBox = _selectedBox == 'Custom...'
-        ? _customBoxController.text.trim()
-        : _selectedBox.trim();
+    // Resolve Shelf & Box (Custom direct user inputs)
+    final finalShelf = _shelfController.text.trim();
+    final finalBox = _boxController.text.trim();
 
     final finalStock = int.tryParse(_stockController.text.trim()) ?? _stockCount;
 
