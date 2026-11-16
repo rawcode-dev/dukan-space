@@ -85,13 +85,21 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(
+                    'assets/images/app_icon.png',
+                    width: 40,
+                    height: 40,
+                    errorBuilder: (_, __, ___) => Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.bug_report, color: theme.colorScheme.onPrimaryContainer),
+                    ),
                   ),
-                  child: Icon(Icons.bug_report, color: theme.colorScheme.onPrimaryContainer),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

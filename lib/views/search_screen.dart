@@ -86,11 +86,19 @@ class SearchScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/images/app_icon.png',
+                width: 80,
+                height: 80,
+                errorBuilder: (_, __, ___) => Icon(Icons.search, size: 64, color: Colors.grey.shade400),
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
               'Search any product, phone model, shelf, or box',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 15, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 6),
             Text(

@@ -50,11 +50,19 @@ class InventoryScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
-                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/app_icon.png',
+                          width: 72,
+                          height: 72,
+                          errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Text(
                         'No inventory items recorded yet.',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 15, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 8),
                       Text(
