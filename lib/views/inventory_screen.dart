@@ -28,7 +28,7 @@ class InventoryScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Filter by group, type, shelf, or box...',
+                hintText: 'Filter by model, type, group, shelf, or box...',
                 prefixIcon: const Icon(Icons.filter_list, size: 20),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                 filled: true,
@@ -87,6 +87,7 @@ class InventoryScreen extends StatelessWidget {
     InventoryViewModel vm,
   ) {
     final theme = Theme.of(context);
+    final group = item.accessoryGroupId.trim();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -108,27 +109,29 @@ class InventoryScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          item.itemType,
+                          item.displayName,
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          item.accessoryGroupId,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onSecondaryContainer,
+                      if (group.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            group,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSecondaryContainer,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -225,6 +228,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     'Charging Cable',
     'Charging Adapter',
     'Earphones / TWS',
+    'Universal Mount / Stand',
     'Custom...',
   ];
 
@@ -239,14 +243,15 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
   late String _selectedItemType;
   late String _selectedShelf;
   late String _selectedBox;
-  String? _selectedGroup;
 
+  final _modelController = TextEditingController();
   final _customTypeController = TextEditingController();
-  final _customGroupController = TextEditingController();
+  final _groupController = TextEditingController();
   final _customShelfController = TextEditingController();
   final _customBoxController = TextEditingController();
   final _stockController = TextEditingController();
 
+  String? _autoDetectedGroupHint;
   int _stockCount = 1;
   bool _isSaving = false;
 
@@ -254,6 +259,9 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
   void initState() {
     super.initState();
     final item = widget.existingItem;
+
+    // Model name setup
+    _modelController.text = item?.modelName ?? '';
 
     // Item Type setup
     if (item != null && item.itemType.isNotEmpty) {
@@ -292,9 +300,9 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     }
 
     // Group setup
+    _groupController.text = item?.accessoryGroupId ?? '';
     if (item != null && item.accessoryGroupId.isNotEmpty) {
-      _selectedGroup = item.accessoryGroupId;
-      _customGroupController.text = item.accessoryGroupId;
+      _autoDetectedGroupHint = 'Existing Group: ${item.accessoryGroupId}';
     }
 
     // Stock count
@@ -304,12 +312,38 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
 
   @override
   void dispose() {
+    _modelController.dispose();
     _customTypeController.dispose();
-    _customGroupController.dispose();
+    _groupController.dispose();
     _customShelfController.dispose();
     _customBoxController.dispose();
     _stockController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAutoGroup(String modelName) async {
+    final clean = modelName.trim();
+    if (clean.isEmpty) {
+      setState(() => _autoDetectedGroupHint = null);
+      return;
+    }
+
+    final vm = widget.parentContext.read<InventoryViewModel>();
+    final autoGroup = await vm.findAutoGroup(clean);
+
+    if (mounted) {
+      setState(() {
+        if (autoGroup != null && autoGroup.isNotEmpty) {
+          _autoDetectedGroupHint = '✨ Auto-detected Catalog Group: $autoGroup';
+          // Auto-fill Group field if currently empty
+          if (_groupController.text.trim().isEmpty) {
+            _groupController.text = autoGroup;
+          }
+        } else {
+          _autoDetectedGroupHint = 'ℹ️ Standalone item (No matching catalog group found)';
+        }
+      });
+    }
   }
 
   void _updateStock(int delta) {
@@ -323,13 +357,6 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
   Widget build(BuildContext context) {
     final vm = widget.parentContext.watch<InventoryViewModel>();
     final theme = Theme.of(context);
-
-    // Build available group choices
-    final groupOptions = <String>{...vm.existingGroups};
-    if (widget.existingItem != null && widget.existingItem!.accessoryGroupId.isNotEmpty) {
-      groupOptions.add(widget.existingItem!.accessoryGroupId);
-    }
-    final List<String> groupList = groupOptions.toList()..sort();
 
     return Padding(
       padding: EdgeInsets.only(
@@ -360,11 +387,63 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
               ),
               const SizedBox(height: 16),
 
-              // 1. Item Type (Dropdown)
+              // 1. Phone Model / Product Name (Autocomplete or free-form text)
+              Autocomplete<String>(
+                initialValue: TextEditingValue(text: _modelController.text),
+                optionsBuilder: (TextEditingValue textVal) {
+                  if (textVal.text.trim().isEmpty) return const Iterable<String>.empty();
+                  final query = textVal.text.toLowerCase();
+                  return vm.existingModels.where((m) => m.toLowerCase().contains(query)).take(6);
+                },
+                onSelected: (String selection) {
+                  _modelController.text = selection;
+                  _checkAutoGroup(selection);
+                },
+                fieldViewBuilder: (ctx, controller, focusNode, onFieldSubmitted) {
+                  controller.addListener(() {
+                    if (_modelController.text != controller.text) {
+                      _modelController.text = controller.text;
+                      _checkAutoGroup(controller.text);
+                    }
+                  });
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: 'Phone Model / Product Name',
+                      hintText: 'e.g. iPhone 13, Redmi Note 12, Type-C Cable...',
+                      prefixIcon: const Icon(Icons.phone_android),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onFieldSubmitted: (v) {
+                      onFieldSubmitted();
+                      _checkAutoGroup(v);
+                    },
+                  );
+                },
+              ),
+              if (_autoDetectedGroupHint != null) ...[
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4.0),
+                  child: Text(
+                    _autoDetectedGroupHint!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _autoDetectedGroupHint!.startsWith('✨') ? Colors.teal : Colors.blueGrey,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+
+              // 2. Category / Item Type (Dropdown)
               DropdownButtonFormField<String>(
                 value: _selectedItemType,
                 decoration: InputDecoration(
-                  labelText: 'Item Type',
+                  labelText: 'Item Category / Type',
                   prefixIcon: const Icon(Icons.category_outlined),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -381,75 +460,30 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
                 TextFormField(
                   controller: _customTypeController,
                   decoration: InputDecoration(
-                    labelText: 'Enter Custom Item Type',
-                    hintText: 'e.g. Hydrogel Screen Guard',
+                    labelText: 'Enter Custom Category',
+                    hintText: 'e.g. Hydrogel Film, Wireless Charger',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Please specify item type' : null,
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Please specify category' : null,
                 ),
               ],
               const SizedBox(height: 14),
 
-              // 2. Accessory Group ID (Dropdown if groups exist, else text input)
-              if (groupList.isNotEmpty) ...[
-                DropdownButtonFormField<String>(
-                  value: _selectedGroup != null && groupList.contains(_selectedGroup)
-                      ? _selectedGroup
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: 'Accessory Group ID',
-                    prefixIcon: const Icon(Icons.tag),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    helperText: 'Links phone models that share this accessory size',
-                  ),
-                  hint: const Text('Select existing group or create new'),
-                  items: [
-                    ...groupList.map((g) => DropdownMenuItem(value: g, child: Text(g))),
-                    const DropdownMenuItem(value: '__NEW__', child: Text('+ Enter New Group ID...')),
-                  ],
-                  onChanged: (val) {
-                    setState(() {
-                      if (val == '__NEW__') {
-                        _selectedGroup = '__NEW__';
-                      } else {
-                        _selectedGroup = val;
-                      }
-                    });
-                  },
-                  validator: (v) {
-                    if (_selectedGroup == null) return 'Please choose or enter a Group ID';
-                    return null;
-                  },
+              // 3. Accessory Group ID (OPTIONAL!)
+              TextFormField(
+                controller: _groupController,
+                decoration: InputDecoration(
+                  labelText: 'Accessory Group ID (Optional)',
+                  hintText: 'e.g. GRP-IP13 (leave empty for auto-group or standalone)',
+                  helperText: 'Auto-detected from phone models. Optional for standalone items.',
+                  prefixIcon: const Icon(Icons.tag),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-                if (_selectedGroup == '__NEW__') ...[
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _customGroupController,
-                    decoration: InputDecoration(
-                      labelText: 'New Group ID',
-                      hintText: 'e.g. GRP-IP14 or GRP-RN12',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                  ),
-                ],
-              ] else ...[
-                TextFormField(
-                  controller: _customGroupController,
-                  decoration: InputDecoration(
-                    labelText: 'Accessory Group ID (e.g. GRP-A)',
-                    prefixIcon: const Icon(Icons.tag),
-                    hintText: 'e.g. GRP-RN12',
-                    helperText: 'Links phone models sharing this group to this stock',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                ),
-              ],
+              ),
               const SizedBox(height: 14),
 
-              // 3. Shelf and Box (Dropdowns with Custom option)
+              // 4. Shelf and Box (Dropdowns with Custom option)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -526,7 +560,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
               ),
               const SizedBox(height: 16),
 
-              // 4. Stock Stepper with +/- buttons
+              // 5. Stock Stepper
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
@@ -580,6 +614,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
                     : const Icon(Icons.check),
                 label: Text(_isSaving ? 'Saving...' : 'Save Record'),
                 style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F766E),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
@@ -594,18 +629,16 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
   Future<void> _saveRecord() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Resolve Model Name
+    final finalModel = _modelController.text.trim();
+
     // Resolve Item Type
     final finalType = _selectedItemType == 'Custom...'
         ? _customTypeController.text.trim()
         : _selectedItemType.trim();
 
-    // Resolve Group ID
-    String finalGroup;
-    if (_selectedGroup == '__NEW__' || _selectedGroup == null) {
-      finalGroup = _customGroupController.text.trim();
-    } else {
-      finalGroup = _selectedGroup!.trim();
-    }
+    // Resolve Group ID (Optional)
+    final finalGroup = _groupController.text.trim();
 
     // Resolve Shelf
     final finalShelf = _selectedShelf == 'Custom...'
@@ -623,6 +656,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
 
     final newItem = InventoryItem(
       id: widget.existingItem?.id,
+      modelName: finalModel,
       accessoryGroupId: finalGroup,
       itemType: finalType,
       shelfNo: finalShelf,
@@ -640,7 +674,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(widget.parentContext).showSnackBar(
         SnackBar(
-          content: Text('Saved: $finalType ($finalGroup)'),
+          content: Text('Saved: ${newItem.displayName}'),
           backgroundColor: const Color(0xFF0F766E),
           behavior: SnackBarBehavior.floating,
         ),
@@ -648,7 +682,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     } else {
       ScaffoldMessenger.of(widget.parentContext).showSnackBar(
         SnackBar(
-          content: Text(vm.errorMessage ?? 'Failed to save item to database'),
+          content: Text(vm.errorMessage ?? 'Failed to save inventory item'),
           backgroundColor: Colors.red.shade800,
           behavior: SnackBarBehavior.floating,
         ),

@@ -17,6 +17,7 @@ class InventoryViewModel extends ChangeNotifier {
   String? _errorMessage;
   Map<String, int> _stats = {'models': 0, 'items': 0, 'stock': 0};
 
+  List<String> _existingModels = [];
   List<String> _existingGroups = [];
   List<String> _existingShelves = [];
   List<String> _existingBoxes = [];
@@ -27,6 +28,7 @@ class InventoryViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   Map<String, int> get stats => _stats;
 
+  List<String> get existingModels => _existingModels;
   List<String> get existingGroups => _existingGroups;
   List<String> get existingShelves => _existingShelves;
   List<String> get existingBoxes => _existingBoxes;
@@ -55,12 +57,17 @@ class InventoryViewModel extends ChangeNotifier {
 
   Future<void> loadMetadata() async {
     try {
+      _existingModels = await _repository.getDistinctModelNames();
       _existingGroups = await _repository.getDistinctGroupIds();
       _existingShelves = await _repository.getDistinctShelves();
       _existingBoxes = await _repository.getDistinctBoxes();
-    } catch (e, stack) {
-      DiagnosticService.instance.logError('INVENTORY_VM', 'loadMetadata failed', e, stack);
+    } catch (e) {
+      DiagnosticService.instance.logError('INVENTORY_VM', 'loadMetadata failed', e);
     }
+  }
+
+  Future<String?> findAutoGroup(String modelName) async {
+    return await _repository.findGroupIdForModel(modelName);
   }
 
   void filterInventory(String query) {
@@ -71,19 +78,34 @@ class InventoryViewModel extends ChangeNotifier {
 
   Future<bool> saveOrUpdateItem(InventoryItem item) async {
     _errorMessage = null;
+
+    // Auto-resolve group ID if empty but model name matches catalog
+    var itemToSave = item;
+    if (itemToSave.accessoryGroupId.trim().isEmpty && itemToSave.modelName.trim().isNotEmpty) {
+      final autoGroup = await findAutoGroup(itemToSave.modelName);
+      if (autoGroup != null && autoGroup.isNotEmpty) {
+        itemToSave = itemToSave.copyWith(accessoryGroupId: autoGroup);
+        DiagnosticService.instance.logInfo('INVENTORY_VM', 'Auto-resolved Group "${autoGroup}" for model "${itemToSave.modelName}"');
+      }
+    }
+
     DiagnosticService.instance.logAction(
       'INVENTORY_VM',
-      item.id == null ? 'saveNewItem' : 'updateItem',
-      item.toMap(),
+      itemToSave.id == null ? 'saveNewItem' : 'updateItem',
+      itemToSave.toMap(),
     );
+
     try {
-      if (item.id == null) {
-        await _repository.insertInventory(item);
+      if (itemToSave.id == null) {
+        await _repository.insertInventory(itemToSave);
       } else {
-        await _repository.updateInventory(item);
+        await _repository.updateInventory(itemToSave);
       }
       await loadInventory();
-      DiagnosticService.instance.logInfo('INVENTORY_VM', 'Item saved successfully: ${item.itemType} (${item.accessoryGroupId})');
+      DiagnosticService.instance.logInfo(
+        'INVENTORY_VM',
+        'Item saved successfully: ${itemToSave.displayName} (Group: ${itemToSave.accessoryGroupId.isEmpty ? "None" : itemToSave.accessoryGroupId})',
+      );
       return true;
     } catch (e, stack) {
       _errorMessage = e.toString();
@@ -102,7 +124,7 @@ class InventoryViewModel extends ChangeNotifier {
 
     DiagnosticService.instance.logAction('INVENTORY_VM', 'adjustStock', {
       'id': id,
-      'type': current.itemType,
+      'name': current.displayName,
       'oldStock': current.stockCount,
       'newStock': updatedStock,
       'delta': delta,
@@ -115,8 +137,8 @@ class InventoryViewModel extends ChangeNotifier {
     try {
       await _repository.updateStockCount(id, updatedStock);
       _stats = await _repository.getQuickStats();
-    } catch (e, stack) {
-      DiagnosticService.instance.logError('INVENTORY_VM', 'adjustStock failed for id $id', e, stack);
+    } catch (e) {
+      DiagnosticService.instance.logError('INVENTORY_VM', 'adjustStock failed for id $id', e);
     }
     notifyListeners();
   }

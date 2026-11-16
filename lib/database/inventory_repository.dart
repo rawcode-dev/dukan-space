@@ -10,7 +10,7 @@ class InventoryRepository {
   InventoryRepository({DBProvider? dbProvider})
       : _dbProvider = dbProvider ?? DBProvider.instance;
 
-  // ------------------ Phone Models Queries ------------------
+  // ------------------ Phone Models / Compatibility Queries ------------------
 
   Future<PhoneModel?> getPhoneModelByName(String phoneName) async {
     try {
@@ -31,6 +31,52 @@ class InventoryRepository {
     }
   }
 
+  /// Looks up whether a phone model exists in the catalog and auto-resolves its group ID
+  Future<String?> findGroupIdForModel(String modelName) async {
+    final clean = modelName.trim().toLowerCase();
+    if (clean.isEmpty) return null;
+    try {
+      final db = await _dbProvider.database;
+
+      // 1. Try exact match
+      final exact = await db.query(
+        DBProvider.tablePhoneModels,
+        columns: ['accessory_group_id'],
+        where: 'LOWER(phone_name) = ?',
+        whereArgs: [clean],
+        limit: 1,
+      );
+      if (exact.isNotEmpty) {
+        final gid = exact.first['accessory_group_id'] as String?;
+        if (gid != null && gid.trim().isNotEmpty) {
+          DiagnosticService.instance.logInfo('DB_REPO', 'Exact auto-group match: "$modelName" -> "$gid"');
+          return gid.trim();
+        }
+      }
+
+      // 2. Try partial/like match
+      final partial = await db.query(
+        DBProvider.tablePhoneModels,
+        columns: ['accessory_group_id'],
+        where: 'LOWER(phone_name) LIKE ?',
+        whereArgs: ['%$clean%'],
+        limit: 1,
+      );
+      if (partial.isNotEmpty) {
+        final gid = partial.first['accessory_group_id'] as String?;
+        if (gid != null && gid.trim().isNotEmpty) {
+          DiagnosticService.instance.logInfo('DB_REPO', 'Partial auto-group match: "$modelName" -> "$gid"');
+          return gid.trim();
+        }
+      }
+
+      return null;
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('DB_REPO', 'findGroupIdForModel failed for "$modelName"', e, stack);
+      return null;
+    }
+  }
+
   Future<List<PhoneModel>> searchPhoneModels(String query, {int limit = 15}) async {
     try {
       final db = await _dbProvider.database;
@@ -43,10 +89,9 @@ class InventoryRepository {
         orderBy: 'phone_name ASC',
       );
       final models = results.map((m) => PhoneModel.fromMap(m)).toList();
-      DiagnosticService.instance.logInfo('DB_REPO', 'searchPhoneModels("$query") -> found ${models.length} matches');
       return models;
     } catch (e, stack) {
-      DiagnosticService.instance.logError('DB_REPO', 'searchPhoneModels query failed for "$query"', e, stack);
+      DiagnosticService.instance.logError('DB_REPO', 'searchPhoneModels failed for "$query"', e, stack);
       rethrow;
     }
   }
@@ -55,6 +100,7 @@ class InventoryRepository {
     String groupId, {
     String? excludeModel,
   }) async {
+    if (groupId.trim().isEmpty) return [];
     try {
       final db = await _dbProvider.database;
       final whereClause = excludeModel != null
@@ -132,21 +178,42 @@ class InventoryRepository {
     }
   }
 
-  // ------------------ Inventory Queries ------------------
+  // ------------------ Direct Inventory Queries ------------------
 
   Future<List<InventoryItem>> getInventoryByGroupId(String groupId) async {
+    if (groupId.trim().isEmpty) return [];
     try {
       final db = await _dbProvider.database;
       final results = await db.query(
         DBProvider.tableInventory,
         where: 'accessory_group_id = ?',
         whereArgs: [groupId.trim()],
-        orderBy: 'item_type ASC',
+        orderBy: 'id DESC',
       );
       final items = results.map((m) => InventoryItem.fromMap(m)).toList();
       return items;
     } catch (e, stack) {
       DiagnosticService.instance.logError('DB_REPO', 'getInventoryByGroupId("$groupId") failed', e, stack);
+      return [];
+    }
+  }
+
+  Future<List<InventoryItem>> searchInventoryDirect(String query, {int limit = 50}) async {
+    final clean = query.trim().toLowerCase();
+    if (clean.isEmpty) return [];
+    try {
+      final db = await _dbProvider.database;
+      final pattern = '%$clean%';
+      final results = await db.query(
+        DBProvider.tableInventory,
+        where: 'LOWER(model_name) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?',
+        whereArgs: [pattern, pattern, pattern, pattern, pattern],
+        limit: limit,
+        orderBy: 'id DESC',
+      );
+      return results.map((m) => InventoryItem.fromMap(m)).toList();
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('DB_REPO', 'searchInventoryDirect failed for "$query"', e, stack);
       return [];
     }
   }
@@ -163,8 +230,8 @@ class InventoryRepository {
 
       if (query != null && query.trim().isNotEmpty) {
         final clean = '%${query.trim().toLowerCase()}%';
-        where = 'LOWER(accessory_group_id) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?';
-        whereArgs = [clean, clean, clean, clean];
+        where = 'LOWER(model_name) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?';
+        whereArgs = [clean, clean, clean, clean, clean];
       }
 
       final results = await db.query(
@@ -192,7 +259,7 @@ class InventoryRepository {
         item.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-      DiagnosticService.instance.logInfo('DB_REPO', 'insertInventory successful -> generated id: $id');
+      DiagnosticService.instance.logInfo('DB_REPO', 'insertInventory successful -> id: $id');
       return id;
     } catch (e, stack) {
       DiagnosticService.instance.logError('DB_REPO', 'insertInventory failed for ${item.toMap()}', e, stack);
@@ -212,7 +279,7 @@ class InventoryRepository {
           whereArgs: [item.id],
         );
         if (count > 0) {
-          DiagnosticService.instance.logInfo('DB_REPO', 'upsertInventory updated existing item ${item.id}');
+          DiagnosticService.instance.logInfo('DB_REPO', 'upsertInventory updated item ${item.id}');
           return item.id!;
         }
       }
@@ -239,7 +306,7 @@ class InventoryRepository {
         where: 'id = ?',
         whereArgs: [item.id],
       );
-      DiagnosticService.instance.logInfo('DB_REPO', 'updateInventory row count: $count');
+      DiagnosticService.instance.logInfo('DB_REPO', 'updateInventory rows affected: $count');
       return count;
     } catch (e, stack) {
       DiagnosticService.instance.logError('DB_REPO', 'updateInventory failed for id ${item.id}', e, stack);
@@ -302,6 +369,22 @@ class InventoryRepository {
     } catch (e, stack) {
       DiagnosticService.instance.logError('DB_REPO', 'getQuickStats failed', e, stack);
       return {'models': 0, 'items': 0, 'stock': 0};
+    }
+  }
+
+  Future<List<String>> getDistinctModelNames() async {
+    try {
+      final db = await _dbProvider.database;
+      final results = await db.rawQuery('''
+        SELECT DISTINCT phone_name AS name FROM ${DBProvider.tablePhoneModels} WHERE phone_name != ''
+        UNION
+        SELECT DISTINCT model_name AS name FROM ${DBProvider.tableInventory} WHERE model_name != ''
+        ORDER BY name ASC
+      ''');
+      return results.map((r) => r['name'] as String).toList();
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('DB_REPO', 'getDistinctModelNames failed', e, stack);
+      return [];
     }
   }
 

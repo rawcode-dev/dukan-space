@@ -13,12 +13,12 @@ class SearchViewModel extends ChangeNotifier {
   String _searchQuery = '';
   bool _isLoading = false;
   String? _errorMessage;
-  List<PhoneSearchResult> _results = [];
+  List<SearchResultItem> _results = [];
 
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  List<PhoneSearchResult> get results => _results;
+  List<SearchResultItem> get results => _results;
 
   void onQueryChanged(String query) {
     _searchQuery = query;
@@ -32,8 +32,8 @@ class SearchViewModel extends ChangeNotifier {
       return;
     }
 
-    // 300ms debounce prevents CPU throttling on low-spec chipsets
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+    // 250ms debounce prevents unnecessary queries while user is typing
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
       executeSearch();
     });
   }
@@ -47,7 +47,7 @@ class SearchViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _results = await _searchService.searchByPhone(clean);
+      _results = await _searchService.search(clean);
     } catch (e, stack) {
       _errorMessage = 'Search failed: ${e.toString()}';
       _results = [];

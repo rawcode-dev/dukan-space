@@ -13,7 +13,7 @@ class SearchScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Search Compatibility'),
+        title: const Text('Inventory & Compatibility Search'),
         actions: [
           IconButton(
             icon: const Icon(Icons.bug_report_outlined),
@@ -27,7 +27,7 @@ class SearchScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: SearchBar(
-              hintText: 'Enter phone model (e.g. Redmi Note 12)...',
+              hintText: 'Search phone, item name, shelf, or box...',
               leading: const Icon(Icons.search),
               trailing: vm.searchQuery.isNotEmpty
                   ? [
@@ -63,9 +63,20 @@ class SearchScreen extends StatelessWidget {
   Widget _buildResultsList(BuildContext context, SearchViewModel vm) {
     if (vm.errorMessage != null) {
       return Center(
-        child: Text(
-          vm.errorMessage!,
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+              const SizedBox(height: 12),
+              Text(
+                vm.errorMessage!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -75,11 +86,16 @@ class SearchScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.phone_android, size: 64, color: Colors.grey.shade400),
+            Icon(Icons.search, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 12),
             Text(
-              'Search phone to find shelf, box & fits',
+              'Search any product, phone model, shelf, or box',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Cross-compatibility ("Also fits") lights up automatically if available',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
             ),
           ],
         ),
@@ -96,13 +112,13 @@ class SearchScreen extends StatelessWidget {
               Icon(Icons.search_off_outlined, size: 56, color: Colors.grey.shade400),
               const SizedBox(height: 12),
               Text(
-                'No models found matching "${vm.searchQuery}"',
+                'No inventory matching "${vm.searchQuery}"',
                 style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'Tip: Import your Excel model catalog from the "Import" tab to search compatibilities.',
+                'Tip: Add items in the "Inventory" tab or import an Excel catalog in the "Import" tab.',
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
@@ -112,23 +128,24 @@ class SearchScreen extends StatelessWidget {
       );
     }
 
-    // Memory efficient virtualized list view for budget phones
+    // Memory efficient virtualized list view for low-RAM devices
     return ListView.builder(
       itemCount: vm.results.length,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemBuilder: (context, index) {
         final result = vm.results[index];
-        return _buildModelResultCard(context, result);
+        return _buildInventoryResultCard(context, result);
       },
     );
   }
 
-  Widget _buildModelResultCard(BuildContext context, PhoneSearchResult result) {
+  Widget _buildInventoryResultCard(BuildContext context, SearchResultItem result) {
     final theme = Theme.of(context);
-    final group = result.matchedModel.accessoryGroupId;
+    final item = result.item;
+    final group = item.accessoryGroupId.trim();
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
       color: theme.colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
@@ -144,87 +161,75 @@ class SearchScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    result.matchedModel.phoneName,
+                    item.displayName,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
+                if (group.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Group: $group',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.blueGrey.shade50,
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'Group: $group',
+                    'Shelf: ${item.shelfNo}   •   Box: ${item.boxNo}',
+                    style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade800),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: item.stockCount > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Stock: ${item.stockCount}',
                     style: TextStyle(
+                      color: item.stockCount > 0 ? Colors.green.shade900 : Colors.red.shade900,
+                      fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            if (result.accessories.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Text(
-                  'No stock configured for this accessory group yet.',
-                  style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
-                ),
-              )
-            else
-              Column(
-                children: result.accessories.map((acc) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            acc.itemType,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text('Shelf: ${acc.shelfNo} | Box: ${acc.boxNo}'),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: acc.stockCount > 0 ? Colors.green.shade50 : Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Stock: ${acc.stockCount}',
-                            style: TextStyle(
-                              color: acc.stockCount > 0 ? Colors.green.shade900 : Colors.red.shade900,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
             if (result.alsoFitsModels.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
               const SizedBox(height: 8),
-              const Text(
-                'Also fits:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+              Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, size: 14, color: Colors.teal),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Also fits ${result.alsoFitsModels.length} models:',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.teal),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -251,4 +256,3 @@ class SearchScreen extends StatelessWidget {
     );
   }
 }
-

@@ -1,17 +1,16 @@
 import '../database/inventory_repository.dart';
 import '../models/inventory_item.dart';
-import '../models/phone_model.dart';
 import 'diagnostic_service.dart';
 
-class PhoneSearchResult {
-  final PhoneModel matchedModel;
-  final List<InventoryItem> accessories;
+class SearchResultItem {
+  final InventoryItem item;
   final List<String> alsoFitsModels;
+  final String? matchedPhoneModel;
 
-  const PhoneSearchResult({
-    required this.matchedModel,
-    required this.accessories,
-    required this.alsoFitsModels,
+  const SearchResultItem({
+    required this.item,
+    this.alsoFitsModels = const [],
+    this.matchedPhoneModel,
   });
 }
 
@@ -21,44 +20,60 @@ class SearchService {
   SearchService({required InventoryRepository repository})
       : _repository = repository;
 
-  Future<List<PhoneSearchResult>> searchByPhone(String query) async {
+  Future<List<SearchResultItem>> search(String query) async {
     final clean = query.trim();
     if (clean.isEmpty) return [];
 
     final stopwatch = Stopwatch()..start();
-    DiagnosticService.instance.logAction('SEARCH', 'Search initiated for model', {'query': clean});
+    DiagnosticService.instance.logAction('SEARCH', 'Search initiated', {'query': clean});
 
     try {
-      // 1. Fetch matching phone models (Indexed LIKE query)
-      final matchedModels = await _repository.searchPhoneModels(clean, limit: 10);
-      if (matchedModels.isEmpty) {
-        DiagnosticService.instance.logWarning('SEARCH', '0 models matched for query "$clean"');
-        return [];
+      final Map<int, SearchResultItem> resultMap = {};
+
+      // 1. DIRECT INVENTORY SEARCH (Product model name, category, shelf, box, group)
+      final directItems = await _repository.searchInventoryDirect(clean);
+      for (final item in directItems) {
+        if (item.id == null) continue;
+        List<String> alsoFits = [];
+        if (item.accessoryGroupId.isNotEmpty) {
+          alsoFits = await _repository.getCompatibleModelsForGroup(
+            item.accessoryGroupId,
+            excludeModel: item.modelName,
+          );
+        }
+        resultMap[item.id!] = SearchResultItem(
+          item: item,
+          alsoFitsModels: alsoFits,
+          matchedPhoneModel: item.modelName.isNotEmpty ? item.modelName : null,
+        );
       }
 
-      final List<PhoneSearchResult> results = [];
-
-      // 2. Fetch inventory accessories & compatible sibling models
+      // 2. COMPATIBILITY CATALOG SEARCH (Lookup phone models in catalog)
+      final matchedModels = await _repository.searchPhoneModels(clean, limit: 10);
       for (final model in matchedModels) {
-        final accessories = await _repository.getInventoryByGroupId(
-          model.accessoryGroupId,
-        );
+        final groupItems = await _repository.getInventoryByGroupId(model.accessoryGroupId);
         final compatibleModels = await _repository.getCompatibleModelsForGroup(
           model.accessoryGroupId,
           excludeModel: model.phoneName,
         );
 
-        results.add(PhoneSearchResult(
-          matchedModel: model,
-          accessories: accessories,
-          alsoFitsModels: compatibleModels,
-        ));
+        for (final item in groupItems) {
+          if (item.id != null && !resultMap.containsKey(item.id)) {
+            resultMap[item.id!] = SearchResultItem(
+              item: item,
+              alsoFitsModels: compatibleModels,
+              matchedPhoneModel: model.phoneName,
+            );
+          }
+        }
       }
 
+      final results = resultMap.values.toList();
       stopwatch.stop();
+
       DiagnosticService.instance.logInfo(
         'SEARCH',
-        'Search for "$clean" completed in ${stopwatch.elapsedMilliseconds}ms: ${results.length} models, ${results.fold<int>(0, (prev, r) => prev + r.accessories.length)} accessories mapped',
+        'Search for "$clean" completed in ${stopwatch.elapsedMilliseconds}ms: ${results.length} inventory items found (${directItems.length} direct, ${matchedModels.length} catalog models matched)',
       );
 
       return results;
@@ -67,4 +82,7 @@ class SearchService {
       rethrow;
     }
   }
+
+  // Backwards compatibility alias
+  Future<List<SearchResultItem>> searchByPhone(String query) => search(query);
 }
