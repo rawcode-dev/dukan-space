@@ -13,25 +13,48 @@ class InventoryViewModel extends ChangeNotifier {
   List<InventoryItem> _items = [];
   bool _isLoading = false;
   String? _filterQuery;
+  String? _errorMessage;
   Map<String, int> _stats = {'models': 0, 'items': 0, 'stock': 0};
+
+  List<String> _existingGroups = [];
+  List<String> _existingShelves = [];
+  List<String> _existingBoxes = [];
 
   List<InventoryItem> get items => _items;
   bool get isLoading => _isLoading;
   String? get filterQuery => _filterQuery;
+  String? get errorMessage => _errorMessage;
   Map<String, int> get stats => _stats;
+
+  List<String> get existingGroups => _existingGroups;
+  List<String> get existingShelves => _existingShelves;
+  List<String> get existingBoxes => _existingBoxes;
 
   Future<void> loadInventory() async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
       _items = await _repository.getAllInventory(query: _filterQuery);
       _stats = await _repository.getQuickStats();
+      await loadMetadata();
     } catch (e) {
-      debugPrint('Error loading inventory: $e');
+      _errorMessage = 'Failed to load inventory: ${e.toString()}';
+      debugPrint(_errorMessage);
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> loadMetadata() async {
+    try {
+      _existingGroups = await _repository.getDistinctGroupIds();
+      _existingShelves = await _repository.getDistinctShelves();
+      _existingBoxes = await _repository.getDistinctBoxes();
+    } catch (e) {
+      debugPrint('Failed to load metadata: $e');
     }
   }
 
@@ -41,6 +64,7 @@ class InventoryViewModel extends ChangeNotifier {
   }
 
   Future<bool> saveOrUpdateItem(InventoryItem item) async {
+    _errorMessage = null;
     try {
       if (item.id == null) {
         await _repository.insertInventory(item);
@@ -50,7 +74,9 @@ class InventoryViewModel extends ChangeNotifier {
       await loadInventory();
       return true;
     } catch (e) {
+      _errorMessage = e.toString();
       debugPrint('Error saving item: $e');
+      notifyListeners();
       return false;
     }
   }
@@ -66,14 +92,22 @@ class InventoryViewModel extends ChangeNotifier {
     _items[index] = current.copyWith(stockCount: updatedStock);
     notifyListeners();
 
-    await _repository.updateStockCount(id, updatedStock);
-    _stats = await _repository.getQuickStats();
+    try {
+      await _repository.updateStockCount(id, updatedStock);
+      _stats = await _repository.getQuickStats();
+    } catch (e) {
+      debugPrint('Error updating stock: $e');
+    }
     notifyListeners();
   }
 
   Future<void> deleteItem(int id) async {
-    await _repository.deleteInventory(id);
-    await loadInventory();
+    try {
+      await _repository.deleteInventory(id);
+      await loadInventory();
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+    }
   }
 }
-

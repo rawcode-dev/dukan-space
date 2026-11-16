@@ -80,9 +80,26 @@ class SearchScreen extends StatelessWidget {
 
     if (vm.results.isEmpty && !vm.isLoading) {
       return Center(
-        child: Text(
-          'No models found matching "${vm.searchQuery}"',
-          style: TextStyle(color: Colors.grey.shade600),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off_outlined, size: 56, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              Text(
+                'No models found matching "${vm.searchQuery}"',
+                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tip: Import your Excel model catalog from the "Import" tab to search compatibilities.',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }

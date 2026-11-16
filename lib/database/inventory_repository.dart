@@ -208,5 +208,36 @@ class InventoryRepository {
       'stock': totalStockCount,
     };
   }
+
+  Future<List<String>> getDistinctGroupIds() async {
+    final db = await _dbProvider.database;
+    final results = await db.rawQuery('''
+      SELECT DISTINCT accessory_group_id FROM ${DBProvider.tablePhoneModels} WHERE accessory_group_id != ''
+      UNION
+      SELECT DISTINCT accessory_group_id FROM ${DBProvider.tableInventory} WHERE accessory_group_id != ''
+      ORDER BY accessory_group_id ASC
+    ''');
+    return results.map((r) => r['accessory_group_id'] as String).toList();
+  }
+
+  Future<List<String>> getDistinctShelves() async {
+    final db = await _dbProvider.database;
+    final results = await db.rawQuery('''
+      SELECT DISTINCT shelf_no FROM ${DBProvider.tableInventory} 
+      WHERE shelf_no != '' 
+      ORDER BY shelf_no ASC
+    ''');
+    return results.map((r) => r['shelf_no'] as String).toList();
+  }
+
+  Future<List<String>> getDistinctBoxes() async {
+    final db = await _dbProvider.database;
+    final results = await db.rawQuery('''
+      SELECT DISTINCT box_no FROM ${DBProvider.tableInventory} 
+      WHERE box_no != '' 
+      ORDER BY box_no ASC
+    ''');
+    return results.map((r) => r['box_no'] as String).toList();
+  }
 }
 
