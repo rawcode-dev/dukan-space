@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/diagnostic_service.dart';
 import '../services/search_service.dart';
 
 class SearchViewModel extends ChangeNotifier {
@@ -38,17 +39,19 @@ class SearchViewModel extends ChangeNotifier {
   }
 
   Future<void> executeSearch() async {
-    if (_searchQuery.trim().isEmpty) return;
+    final clean = _searchQuery.trim();
+    if (clean.isEmpty) return;
 
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _results = await _searchService.searchByPhone(_searchQuery);
-    } catch (e) {
+      _results = await _searchService.searchByPhone(clean);
+    } catch (e, stack) {
       _errorMessage = 'Search failed: ${e.toString()}';
       _results = [];
+      DiagnosticService.instance.logError('SEARCH_VM', 'executeSearch failed for "$clean"', e, stack);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -69,4 +72,3 @@ class SearchViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
-

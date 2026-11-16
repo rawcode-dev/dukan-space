@@ -31,11 +31,21 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
   }
 
   Future<void> _loadLogs() async {
-    final text = await DiagnosticService.instance.getFullLogText();
-    if (mounted) {
-      setState(() {
-        _cachedLogText = text.isEmpty ? 'No diagnostic logs recorded yet.' : text;
-      });
+    try {
+      final invVm = context.read<InventoryViewModel>();
+      final report = await DiagnosticService.instance.generateDiagnosticReport(dbStats: invVm.stats);
+      if (mounted) {
+        setState(() {
+          _cachedLogText = report;
+        });
+      }
+    } catch (_) {
+      final text = await DiagnosticService.instance.getFullLogText();
+      if (mounted) {
+        setState(() {
+          _cachedLogText = text.isEmpty ? 'No diagnostic logs recorded yet.' : text;
+        });
+      }
     }
   }
 
@@ -271,3 +281,4 @@ class _DiagnosticsSheetState extends State<DiagnosticsSheet> {
     );
   }
 }
+

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../database/inventory_repository.dart';
 import '../models/inventory_item.dart';
+import '../services/diagnostic_service.dart';
 
 class InventoryViewModel extends ChangeNotifier {
   final InventoryRepository _repository;
@@ -39,9 +40,13 @@ class InventoryViewModel extends ChangeNotifier {
       _items = await _repository.getAllInventory(query: _filterQuery);
       _stats = await _repository.getQuickStats();
       await loadMetadata();
-    } catch (e) {
+      DiagnosticService.instance.logInfo(
+        'INVENTORY_VM',
+        'Loaded ${_items.length} inventory items. Total models: ${_stats["models"]}, total stock: ${_stats["stock"]}',
+      );
+    } catch (e, stack) {
       _errorMessage = 'Failed to load inventory: ${e.toString()}';
-      debugPrint(_errorMessage);
+      DiagnosticService.instance.logError('INVENTORY_VM', 'loadInventory failed', e, stack);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -53,18 +58,24 @@ class InventoryViewModel extends ChangeNotifier {
       _existingGroups = await _repository.getDistinctGroupIds();
       _existingShelves = await _repository.getDistinctShelves();
       _existingBoxes = await _repository.getDistinctBoxes();
-    } catch (e) {
-      debugPrint('Failed to load metadata: $e');
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('INVENTORY_VM', 'loadMetadata failed', e, stack);
     }
   }
 
   void filterInventory(String query) {
     _filterQuery = query.isEmpty ? null : query;
+    DiagnosticService.instance.logAction('INVENTORY_VM', 'filterInventory applied', {'filter': query});
     loadInventory();
   }
 
   Future<bool> saveOrUpdateItem(InventoryItem item) async {
     _errorMessage = null;
+    DiagnosticService.instance.logAction(
+      'INVENTORY_VM',
+      item.id == null ? 'saveNewItem' : 'updateItem',
+      item.toMap(),
+    );
     try {
       if (item.id == null) {
         await _repository.insertInventory(item);
@@ -72,10 +83,11 @@ class InventoryViewModel extends ChangeNotifier {
         await _repository.updateInventory(item);
       }
       await loadInventory();
+      DiagnosticService.instance.logInfo('INVENTORY_VM', 'Item saved successfully: ${item.itemType} (${item.accessoryGroupId})');
       return true;
-    } catch (e) {
+    } catch (e, stack) {
       _errorMessage = e.toString();
-      debugPrint('Error saving item: $e');
+      DiagnosticService.instance.logError('INVENTORY_VM', 'saveOrUpdateItem failed', e, stack);
       notifyListeners();
       return false;
     }
@@ -88,6 +100,14 @@ class InventoryViewModel extends ChangeNotifier {
     final current = _items[index];
     final updatedStock = (current.stockCount + delta).clamp(0, 999999);
 
+    DiagnosticService.instance.logAction('INVENTORY_VM', 'adjustStock', {
+      'id': id,
+      'type': current.itemType,
+      'oldStock': current.stockCount,
+      'newStock': updatedStock,
+      'delta': delta,
+    });
+
     // Optimistic UI update for low-spec responsiveness
     _items[index] = current.copyWith(stockCount: updatedStock);
     notifyListeners();
@@ -95,18 +115,21 @@ class InventoryViewModel extends ChangeNotifier {
     try {
       await _repository.updateStockCount(id, updatedStock);
       _stats = await _repository.getQuickStats();
-    } catch (e) {
-      debugPrint('Error updating stock: $e');
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('INVENTORY_VM', 'adjustStock failed for id $id', e, stack);
     }
     notifyListeners();
   }
 
   Future<void> deleteItem(int id) async {
+    DiagnosticService.instance.logAction('INVENTORY_VM', 'deleteItem initiated', {'id': id});
     try {
       await _repository.deleteInventory(id);
       await loadInventory();
-    } catch (e) {
+      DiagnosticService.instance.logInfo('INVENTORY_VM', 'Item $id deleted successfully');
+    } catch (e, stack) {
       _errorMessage = e.toString();
+      DiagnosticService.instance.logError('INVENTORY_VM', 'deleteItem failed for id $id', e, stack);
       notifyListeners();
     }
   }
