@@ -8,6 +8,7 @@ import 'database/inventory_repository.dart';
 import 'services/diagnostic_service.dart';
 import 'services/excel_parser_service.dart';
 import 'services/search_service.dart';
+import 'viewmodels/group_viewmodel.dart';
 import 'viewmodels/import_viewmodel.dart';
 import 'viewmodels/inventory_viewmodel.dart';
 import 'viewmodels/search_viewmodel.dart';
@@ -60,6 +61,9 @@ class DukanSpaceApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<InventoryViewModel>(
           create: (_) => InventoryViewModel(repository: inventoryRepo),
+        ),
+        ChangeNotifierProvider<GroupViewModel>(
+          create: (_) => GroupViewModel(repository: inventoryRepo),
         ),
         ChangeNotifierProvider<ImportViewModel>(
           create: (_) => ImportViewModel(

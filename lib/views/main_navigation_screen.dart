@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'search_screen.dart';
 import 'inventory_screen.dart';
+import 'groups_screen.dart';
 import 'import_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = const [
     SearchScreen(),
     InventoryScreen(),
+    GroupsScreen(),
     ImportScreen(),
   ];
 
@@ -43,6 +45,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             icon: Icon(Icons.inventory_2_outlined),
             selectedIcon: Icon(Icons.inventory_2),
             label: 'Inventory',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.hub_outlined),
+            selectedIcon: Icon(Icons.hub),
+            label: 'Groups',
           ),
           NavigationDestination(
             icon: Icon(Icons.upload_file_outlined),

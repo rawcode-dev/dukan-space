@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/import_viewmodel.dart';
+import '../viewmodels/inventory_viewmodel.dart';
 import 'diagnostics_sheet.dart';
 
 class ImportScreen extends StatelessWidget {
@@ -49,7 +51,27 @@ class ImportScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lightbulb_outline, size: 20, color: theme.colorScheme.secondary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Tip: For small edits or single groups, you can create and edit groups directly in the Groups tab without creating a doc.',
+                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSecondaryContainer),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: vm.isProcessing ? null : vm.pickAndParseExcel,
               icon: const Icon(Icons.file_upload_outlined),
@@ -160,9 +182,13 @@ class ImportScreen extends StatelessWidget {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(ctx).pop();
-                vm.commitImport(mode);
+                final success = await vm.commitImport(mode);
+                if (success && context.mounted) {
+                  context.read<GroupViewModel>().loadGroups();
+                  context.read<InventoryViewModel>().loadInventory();
+                }
               },
               child: const Text('Proceed'),
             ),

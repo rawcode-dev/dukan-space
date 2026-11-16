@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/inventory_item.dart';
+import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/inventory_viewmodel.dart';
 import 'diagnostics_sheet.dart';
+import 'groups_screen.dart';
 
 class InventoryScreen extends StatelessWidget {
   const InventoryScreen({super.key});
@@ -450,15 +452,50 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
               // 3. Accessory Group ID (OPTIONAL!)
               TextFormField(
                 controller: _groupController,
+                textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   labelText: 'Accessory Group ID (Optional)',
                   hintText: 'e.g. GRP-IP13 (leave empty for auto-group or standalone)',
                   helperText: 'Auto-detected from phone models. Optional for standalone items.',
                   prefixIcon: const Icon(Icons.tag),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.hub_outlined, size: 20),
+                    tooltip: 'Manage Compatibility Groups',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const GroupsScreen()),
+                      );
+                    },
+                  ),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
+              if (vm.existingGroups.isNotEmpty && _groupController.text.trim().isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6.0),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Text('Existing: ', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        ...vm.existingGroups.take(6).map((g) => Padding(
+                          padding: const EdgeInsets.only(right: 4.0),
+                          child: ActionChip(
+                            label: Text(g, style: const TextStyle(fontSize: 11)),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              setState(() {
+                                _groupController.text = g;
+                              });
+                            },
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                ),
               const SizedBox(height: 14),
 
               // 4. Shelf and Box (Custom direct user input with autocomplete suggestions)
