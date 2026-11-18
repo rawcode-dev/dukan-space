@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import '../models/accessory_group.dart';
 import '../models/inventory_item.dart';
+import '../models/location_summary_item.dart';
 import '../models/phone_model.dart';
 import '../services/diagnostic_service.dart';
 import 'db_provider.dart';
@@ -190,11 +191,32 @@ class InventoryRepository {
     if (clean.isEmpty) return [];
     try {
       final db = await _dbProvider.database;
-      final pattern = '%$clean%';
+      final tokens = clean.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+      
+      String where;
+      List<dynamic> whereArgs = [];
+
+      if (tokens.length <= 1) {
+        final pattern = '%$clean%';
+        where = 'LOWER(model_name) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?';
+        whereArgs = [pattern, pattern, pattern, pattern, pattern];
+      } else {
+        // Multi-token AND search across all fields (enables "Shelf 1 Box 2" or "iPhone 14 Box 3")
+        final List<String> tokenConditions = [];
+        for (final token in tokens) {
+          final pattern = '%$token%';
+          tokenConditions.add(
+            '(LOWER(model_name) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?)'
+          );
+          whereArgs.addAll([pattern, pattern, pattern, pattern, pattern]);
+        }
+        where = tokenConditions.join(' AND ');
+      }
+
       final results = await db.query(
         DBProvider.tableInventory,
-        where: 'LOWER(model_name) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?',
-        whereArgs: [pattern, pattern, pattern, pattern, pattern],
+        where: where,
+        whereArgs: whereArgs,
         limit: limit,
         orderBy: 'id DESC',
       );
@@ -207,24 +229,55 @@ class InventoryRepository {
 
   Future<List<InventoryItem>> getAllInventory({
     String? query,
+    String? shelfNo,
+    String? boxNo,
     int limit = 50,
     int offset = 0,
   }) async {
     try {
       final db = await _dbProvider.database;
-      String? where;
-      List<dynamic>? whereArgs;
+      final List<String> whereClauses = [];
+      final List<dynamic> whereArgs = [];
 
       if (query != null && query.trim().isNotEmpty) {
-        final clean = '%${query.trim().toLowerCase()}%';
-        where = 'LOWER(model_name) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?';
-        whereArgs = [clean, clean, clean, clean, clean];
+        final clean = query.trim().toLowerCase();
+        final tokens = clean.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+
+        if (tokens.length <= 1) {
+          final pattern = '%$clean%';
+          whereClauses.add(
+            '(LOWER(model_name) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?)'
+          );
+          whereArgs.addAll([pattern, pattern, pattern, pattern, pattern]);
+        } else {
+          final List<String> tokenConditions = [];
+          for (final token in tokens) {
+            final pattern = '%$token%';
+            tokenConditions.add(
+              '(LOWER(model_name) LIKE ? OR LOWER(accessory_group_id) LIKE ? OR LOWER(item_type) LIKE ? OR LOWER(shelf_no) LIKE ? OR LOWER(box_no) LIKE ?)'
+            );
+            whereArgs.addAll([pattern, pattern, pattern, pattern, pattern]);
+          }
+          whereClauses.add('(${tokenConditions.join(' AND ')})');
+        }
       }
+
+      if (shelfNo != null && shelfNo.trim().isNotEmpty) {
+        whereClauses.add('LOWER(TRIM(shelf_no)) = ?');
+        whereArgs.add(shelfNo.trim().toLowerCase());
+      }
+
+      if (boxNo != null && boxNo.trim().isNotEmpty) {
+        whereClauses.add('LOWER(TRIM(box_no)) = ?');
+        whereArgs.add(boxNo.trim().toLowerCase());
+      }
+
+      final where = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
 
       final results = await db.query(
         DBProvider.tableInventory,
         where: where,
-        whereArgs: whereArgs,
+        whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
         limit: limit,
         offset: offset,
         orderBy: 'id DESC',
@@ -417,6 +470,99 @@ class InventoryRepository {
       return results.map((r) => r['box_no'] as String).toList();
     } catch (e, stack) {
       DiagnosticService.instance.logError('DB_REPO', 'getDistinctBoxes failed', e, stack);
+      return [];
+    }
+  }
+
+  /// Retrieves boxes that exist on a specific shelf
+  Future<List<String>> getBoxesForShelf(String shelfNo) async {
+    final clean = shelfNo.trim();
+    if (clean.isEmpty) return [];
+    try {
+      final db = await _dbProvider.database;
+      final results = await db.rawQuery('''
+        SELECT DISTINCT box_no 
+        FROM ${DBProvider.tableInventory} 
+        WHERE LOWER(TRIM(shelf_no)) = ? AND box_no != '' 
+        ORDER BY box_no ASC
+      ''', [clean.toLowerCase()]);
+      return results.map((r) => r['box_no'] as String).toList();
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('DB_REPO', 'getBoxesForShelf failed for "$shelfNo"', e, stack);
+      return [];
+    }
+  }
+
+  /// Fetches all inventory items stored in a given shelf and/or box
+  Future<List<InventoryItem>> getInventoryByLocation({
+    String? shelfNo,
+    String? boxNo,
+  }) async {
+    try {
+      final db = await _dbProvider.database;
+      final List<String> whereClauses = [];
+      final List<dynamic> whereArgs = [];
+
+      if (shelfNo != null && shelfNo.trim().isNotEmpty) {
+        whereClauses.add('LOWER(TRIM(shelf_no)) = ?');
+        whereArgs.add(shelfNo.trim().toLowerCase());
+      }
+
+      if (boxNo != null) {
+        if (boxNo.trim().isNotEmpty) {
+          whereClauses.add('LOWER(TRIM(box_no)) = ?');
+          whereArgs.add(boxNo.trim().toLowerCase());
+        } else {
+          whereClauses.add('(box_no IS NULL OR TRIM(box_no) = "")');
+        }
+      }
+
+      final where = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
+
+      final results = await db.query(
+        DBProvider.tableInventory,
+        where: where,
+        whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+        orderBy: 'shelf_no ASC, box_no ASC, model_name ASC',
+      );
+      return results.map((m) => InventoryItem.fromMap(m)).toList();
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('DB_REPO', 'getInventoryByLocation failed', e, stack);
+      return [];
+    }
+  }
+
+  /// Aggregates all shop locations (Shelf & Box) with item counts and total stock
+  Future<List<LocationSummaryItem>> getLocationSummary() async {
+    try {
+      final db = await _dbProvider.database;
+      final results = await db.rawQuery('''
+        SELECT 
+          COALESCE(TRIM(shelf_no), '') as shelf_no,
+          COALESCE(TRIM(box_no), '') as box_no,
+          COUNT(*) as item_count,
+          SUM(stock_count) as total_stock
+        FROM ${DBProvider.tableInventory}
+        WHERE shelf_no != '' OR box_no != ''
+        GROUP BY shelf_no, box_no
+        ORDER BY shelf_no ASC, box_no ASC
+      ''');
+
+      return results.map((row) {
+        final shelf = (row['shelf_no'] as String?) ?? '';
+        final box = (row['box_no'] as String?) ?? '';
+        final count = (row['item_count'] as int?) ?? (row['item_count'] as num?)?.toInt() ?? 0;
+        final stock = (row['total_stock'] as int?) ?? (row['total_stock'] as num?)?.toInt() ?? 0;
+
+        return LocationSummaryItem(
+          shelfNo: shelf,
+          boxNo: box,
+          itemCount: count,
+          totalStock: stock,
+        );
+      }).toList();
+    } catch (e, stack) {
+      DiagnosticService.instance.logError('DB_REPO', 'getLocationSummary failed', e, stack);
       return [];
     }
   }

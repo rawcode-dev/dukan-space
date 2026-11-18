@@ -14,6 +14,8 @@ class InventoryViewModel extends ChangeNotifier {
   List<InventoryItem> _items = [];
   bool _isLoading = false;
   String? _filterQuery;
+  String? _filterShelf;
+  String? _filterBox;
   String? _errorMessage;
   Map<String, int> _stats = {'models': 0, 'items': 0, 'stock': 0};
 
@@ -25,6 +27,11 @@ class InventoryViewModel extends ChangeNotifier {
   List<InventoryItem> get items => _items;
   bool get isLoading => _isLoading;
   String? get filterQuery => _filterQuery;
+  String? get filterShelf => _filterShelf;
+  String? get filterBox => _filterBox;
+  bool get isLocationFilterActive =>
+      (_filterShelf != null && _filterShelf!.isNotEmpty) ||
+      (_filterBox != null && _filterBox!.isNotEmpty);
   String? get errorMessage => _errorMessage;
   Map<String, int> get stats => _stats;
 
@@ -39,12 +46,16 @@ class InventoryViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _items = await _repository.getAllInventory(query: _filterQuery);
+      _items = await _repository.getAllInventory(
+        query: _filterQuery,
+        shelfNo: _filterShelf,
+        boxNo: _filterBox,
+      );
       _stats = await _repository.getQuickStats();
       await loadMetadata();
       DiagnosticService.instance.logInfo(
         'INVENTORY_VM',
-        'Loaded ${_items.length} inventory items. Total models: ${_stats["models"]}, total stock: ${_stats["stock"]}',
+        'Loaded ${_items.length} inventory items (filter: $_filterQuery, shelf: $_filterShelf, box: $_filterBox). Total models: ${_stats["models"]}, total stock: ${_stats["stock"]}',
       );
     } catch (e, stack) {
       _errorMessage = 'Failed to load inventory: ${e.toString()}';
@@ -73,6 +84,20 @@ class InventoryViewModel extends ChangeNotifier {
   void filterInventory(String query) {
     _filterQuery = query.isEmpty ? null : query;
     DiagnosticService.instance.logAction('INVENTORY_VM', 'filterInventory applied', {'filter': query});
+    loadInventory();
+  }
+
+  void setLocationFilter({String? shelf, String? box}) {
+    _filterShelf = shelf?.trim().isNotEmpty == true ? shelf!.trim() : null;
+    _filterBox = box?.trim().isNotEmpty == true ? box!.trim() : null;
+    DiagnosticService.instance.logAction('INVENTORY_VM', 'setLocationFilter applied', {'shelf': _filterShelf, 'box': _filterBox});
+    loadInventory();
+  }
+
+  void clearLocationFilter() {
+    _filterShelf = null;
+    _filterBox = null;
+    DiagnosticService.instance.logAction('INVENTORY_VM', 'clearLocationFilter applied', {});
     loadInventory();
   }
 

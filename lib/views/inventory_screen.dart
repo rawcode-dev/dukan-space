@@ -19,6 +19,14 @@ class InventoryScreen extends StatelessWidget {
         title: const Text('Stock Inventory'),
         actions: [
           IconButton(
+            icon: Icon(
+              vm.isLocationFilterActive ? Icons.location_on : Icons.shelves,
+              color: vm.isLocationFilterActive ? theme.colorScheme.primary : null,
+            ),
+            tooltip: 'Filter by Shelf & Box',
+            onPressed: () => _openLocationFilterSheet(context, vm),
+          ),
+          IconButton(
             icon: const Icon(Icons.bug_report_outlined),
             tooltip: 'Break Logs & Diagnostics',
             onPressed: () => DiagnosticsSheet.show(context),
@@ -45,43 +53,87 @@ class InventoryScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: vm.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : vm.items.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.asset(
-                          'assets/images/app_icon.png',
-                          width: 72,
-                          height: 72,
-                          errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
-                        ),
+      body: Column(
+        children: [
+          if (vm.isLocationFilterActive)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on, size: 16, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Filtered by Location: ${vm.filterShelf != null && vm.filterShelf!.isNotEmpty ? "Shelf ${vm.filterShelf}" : ""}${vm.filterBox != null && vm.filterBox!.isNotEmpty ? " • Box ${vm.filterBox}" : ""}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: theme.colorScheme.onPrimaryContainer,
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No inventory items recorded yet.',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 15, fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tap "+ Add Item" below to add stock.',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-                      ),
-                    ],
+                    ),
                   ),
-                )
-              : ListView.builder(
-                  itemCount: vm.items.length,
-                  padding: const EdgeInsets.all(16),
-                  itemBuilder: (context, index) {
-                    final item = vm.items[index];
-                    return _buildInventoryCard(context, item, vm);
-                  },
-                ),
+                  InkWell(
+                    onTap: vm.clearLocationFilter,
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.close, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: vm.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : vm.items.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.asset(
+                                'assets/images/app_icon.png',
+                                width: 72,
+                                height: 72,
+                                errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              vm.isLocationFilterActive
+                                  ? 'No items found in this location.'
+                                  : 'No inventory items recorded yet.',
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 15, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            if (vm.isLocationFilterActive)
+                              TextButton.icon(
+                                onPressed: vm.clearLocationFilter,
+                                icon: const Icon(Icons.clear_all, size: 16),
+                                label: const Text('Clear Location Filter'),
+                              )
+                            else
+                              Text(
+                                'Tap "+ Add Item" below to add stock.',
+                                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                              ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: vm.items.length,
+                        padding: const EdgeInsets.all(16),
+                        itemBuilder: (context, index) {
+                          final item = vm.items[index];
+                          return _buildInventoryCard(context, item, vm);
+                        },
+                      ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openItemDialog(context),
         icon: const Icon(Icons.add),
@@ -208,6 +260,117 @@ class InventoryScreen extends StatelessWidget {
       ),
       builder: (ctx) {
         return _AddEditItemSheet(existingItem: item, parentContext: context);
+      },
+    );
+  }
+
+  void _openLocationFilterSheet(BuildContext context, InventoryViewModel vm) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final shelfCtrl = TextEditingController(text: vm.filterShelf ?? '');
+        final boxCtrl = TextEditingController(text: vm.filterBox ?? '');
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final theme = Theme.of(context);
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.shelves, color: theme.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Filter by Shelf & Box',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: shelfCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Shelf (e.g. 1, A)',
+                            prefixIcon: const Icon(Icons.shelves, size: 18),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: boxCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Box (e.g. 2, B)',
+                            prefixIcon: const Icon(Icons.all_inbox, size: 18),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      if (vm.isLocationFilterActive) ...[
+                        OutlinedButton(
+                          onPressed: () {
+                            vm.clearLocationFilter();
+                            Navigator.of(sheetContext).pop();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Clear Filter'),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            vm.setLocationFilter(
+                              shelf: shelfCtrl.text.trim(),
+                              box: boxCtrl.text.trim(),
+                            );
+                            Navigator.of(sheetContext).pop();
+                          },
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Apply Location Filter'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
       },
     );
   }

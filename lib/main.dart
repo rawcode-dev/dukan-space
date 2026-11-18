@@ -57,7 +57,10 @@ class DukanSpaceApp extends StatelessWidget {
         Provider<ExcelParserService>.value(value: excelParserService),
         Provider<DiagnosticService>.value(value: DiagnosticService.instance),
         ChangeNotifierProvider<SearchViewModel>(
-          create: (_) => SearchViewModel(searchService: searchService),
+          create: (_) => SearchViewModel(
+            searchService: searchService,
+            repository: inventoryRepo,
+          ),
         ),
         ChangeNotifierProvider<InventoryViewModel>(
           create: (_) => InventoryViewModel(repository: inventoryRepo),
