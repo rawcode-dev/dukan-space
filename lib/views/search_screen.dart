@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/location_summary_item.dart';
 import '../services/search_service.dart';
 import '../viewmodels/search_viewmodel.dart';
 import 'diagnostics_sheet.dart';

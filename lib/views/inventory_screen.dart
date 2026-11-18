@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/inventory_item.dart';
-import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/inventory_viewmodel.dart';
 import 'diagnostics_sheet.dart';
 import 'groups_screen.dart';

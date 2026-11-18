@@ -34,21 +34,26 @@ jobs:
         run: flutter pub get
 
       - name: Dependency Hygiene & Security Verification
-        run: python3 tool/verify_project.py
+        run: |
+          python3 tool/verify_project.py
+          if [ -f "verify_project_report.md" ] && [ -n "$GITHUB_STEP_SUMMARY" ]; then
+            cat verify_project_report.md >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Code Formatting Verification
         run: dart format --output=none --line-length=120 .
 
       - name: Static Analysis & Lint Report Generation
         run: |
-          set +e
-          flutter analyze --no-fatal-infos 2>&1 | tee flutter_analysis.txt
-          ANALYZER_EXIT=${PIPESTATUS[0]}
-          set -e
+          flutter analyze --no-fatal-infos > flutter_analysis.txt 2>&1 || true
+          cat flutter_analysis.txt
           python3 tool/generate_ci_report.py flutter_analysis.txt analysis_report.md
-          if [ $ANALYZER_EXIT -ne 0 ]; then
-            echo "❌ Flutter analyzer found errors! See summary report above."
-            exit $ANALYZER_EXIT
+          if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+            cat analysis_report.md >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q -E "(error •|error -|warning •|warning -)" flutter_analysis.txt; then
+            echo "❌ Flutter analyzer found errors or warnings! See report above."
+            exit 1
           fi
 
       - name: Unit & Logic Tests
