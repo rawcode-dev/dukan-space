@@ -9,8 +9,45 @@ permissions:
   contents: write
 
 jobs:
+  pre-validation-and-audit:
+    name: Pre-Validation, Security & Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Dependency Hygiene & Security Verification
+        run: python3 tool/verify_project.py
+
+      - name: Code Formatting Verification
+        run: dart format --output=none --line-length=120 .
+
+      - name: Static Analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Unit & Logic Tests
+        run: flutter test
+
   build-apk:
     name: Build Android Release APK
+    needs: pre-validation-and-audit
     runs-on: ubuntu-latest
 
     steps:
@@ -59,4 +96,3 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
