@@ -29,7 +29,7 @@ void main() {
       final fromMapItem = InventoryItem.fromMap(map);
       expect(fromMapItem.id, item.id);
       expect(fromMapItem.modelName, item.modelName);
-      expect(fromMapItem.displayName, 'iPhone 15 Pro (Tempered Glass)');
+      expect(fromMapItem.displayName, 'iPhone 15 Pro Tempered Glass');
       expect(fromMapItem.stockCount, 15);
     });
 

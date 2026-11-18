@@ -59,7 +59,8 @@ jobs:
           fi
 
       - name: Unit & Logic Tests
-        run: flutter test
+        run: |
+          flutter test --reporter expanded 2>&1 | tee test_output.txt
 
       - name: Upload Quality & Audit Reports
         if: always()
@@ -70,6 +71,7 @@ jobs:
             flutter_analysis.txt
             analysis_report.md
             verify_project_report.md
+            test_output.txt
 
   build-apk:
     name: Build Android Release APK
