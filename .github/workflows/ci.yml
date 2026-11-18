@@ -45,16 +45,18 @@ jobs:
       - name: Step 2 - Code Formatting Verification
         run: dart format --output=none --line-length=120 .
 
-      - name: Step 3 - Static Analysis & Lint Report Generation
+      - name: Step 3 - Static Analysis & Lint Report
         run: |
           flutter analyze --no-fatal-infos > flutter_analysis.txt 2>&1 || true
+          echo "=== RAW FLUTTER ANALYZE OUTPUT ==="
           cat flutter_analysis.txt
+          echo "==================================="
           python3 tool/generate_ci_report.py flutter_analysis.txt analysis_report.md
           if [ -n "$GITHUB_STEP_SUMMARY" ]; then
             cat analysis_report.md >> $GITHUB_STEP_SUMMARY
           fi
           if grep -q -E "(error •|error -|warning •|warning -)" flutter_analysis.txt; then
-            echo "❌ Flutter analyzer found errors or warnings! See report above."
+            echo "::error::Flutter analyzer found errors or warnings. Please check the analysis report."
             exit 1
           fi
 

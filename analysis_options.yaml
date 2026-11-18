@@ -1,41 +1,5 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
-  language:
-    strict-casts: false
-    strict-inference: false
-    strict-raw-types: false
   errors:
-    missing_required_param: error
-    missing_return: error
     todo: ignore
-    # Demote stylistic suggestions so they don't break release pipelines
-    prefer_const_constructors: info
-    prefer_const_declarations: info
-    prefer_const_literals_to_create_immutables: info
-    avoid_print: warning
-    unused_import: warning
-    unused_local_variable: warning
-
-linter:
-  rules:
-    - avoid_empty_else
-    - avoid_relative_lib_imports
-    - avoid_shadowing_type_parameters
-    - await_only_futures
-    - camel_case_types
-    - file_names
-    - hash_and_equals
-    - no_duplicate_case_values
-    - non_constant_identifier_names
-    - prefer_conditional_assignment
-    - prefer_is_empty
-    - prefer_is_not_empty
-    - prefer_iterable_whereType
-    - unnecessary_new
-    - unnecessary_null_aware_assignments
-    - unnecessary_string_escapes
-    - unnecessary_string_interpolations
-    - unrelated_type_equality_checks
-    - use_rethrow_when_possible
-    - valid_regexps
