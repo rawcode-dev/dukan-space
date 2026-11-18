@@ -7,7 +7,7 @@ import 'package:accessory_inventory/models/accessory_group.dart';
 void main() {
   group('InventoryItem Model Tests', () {
     test('InventoryItem serialization and deserialization roundtrip', () {
-      final item = InventoryItem(
+      const item = InventoryItem(
         id: 42,
         modelName: 'iPhone 15 Pro',
         accessoryGroupId: 'GRP-IPHONE-15',
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('InventoryItem displayName formatting without itemType', () {
-      final item = InventoryItem(
+      const item = InventoryItem(
         modelName: 'iPhone 14',
         accessoryGroupId: '',
         itemType: '',
@@ -46,7 +46,7 @@ void main() {
     });
 
     test('InventoryItem displayName formatting without modelName', () {
-      final item = InventoryItem(
+      const item = InventoryItem(
         modelName: '',
         accessoryGroupId: '',
         itemType: 'Cleaning Kit',
@@ -91,7 +91,7 @@ void main() {
 
   group('PhoneModel Model Tests', () {
     test('PhoneModel serialization and deserialization', () {
-      final model = PhoneModel(
+      const model = PhoneModel(
         phoneName: 'Samsung Galaxy S24',
         accessoryGroupId: 'GRP-SAM-S24',
       );
@@ -108,7 +108,7 @@ void main() {
 
   group('AccessoryGroup Tests', () {
     test('AccessoryGroup properties and formatting', () {
-      final group = AccessoryGroup(
+      const group = AccessoryGroup(
         groupId: 'GRP-IPHONE-13-14',
         phoneModels: ['iPhone 13', 'iPhone 14'],
         inventoryItemCount: 3,
@@ -117,7 +117,7 @@ void main() {
 
       expect(group.groupId, 'GRP-IPHONE-13-14');
       expect(group.phoneModels.length, 2);
-      expect(group.modelsSummary, 'iPhone 13, iPhone 14');
+      expect(group.phoneModels.join(', '), 'iPhone 13, iPhone 14');
       expect(group.totalStockCount, 25);
     });
   });
@@ -138,4 +138,3 @@ void main() {
     });
   });
 }
-

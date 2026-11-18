@@ -832,6 +832,8 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
       stockCount: finalStock,
     );
 
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(widget.parentContext);
     final vm = widget.parentContext.read<InventoryViewModel>();
     final success = await vm.saveOrUpdateItem(newItem);
 
@@ -839,8 +841,8 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
     setState(() => _isSaving = false);
 
     if (success) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+      nav.pop();
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Saved: ${newItem.displayName}'),
           backgroundColor: const Color(0xFF0F766E),
@@ -848,7 +850,7 @@ class _AddEditItemSheetState extends State<_AddEditItemSheet> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(vm.errorMessage ?? 'Failed to save inventory item'),
           backgroundColor: Colors.red.shade800,
