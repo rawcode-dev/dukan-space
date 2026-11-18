@@ -133,7 +133,9 @@ class DiagnosticService {
       try {
         final content = await _logFile!.readAsString();
         if (content.trim().isNotEmpty) return content;
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Failed to read log file, using memory buffer: $e');
+      }
     }
     return _memoryBuffer.map((e) => e.toFormattedString()).join('\n');
   }
@@ -144,7 +146,9 @@ class DiagnosticService {
       if (_logFile != null && await _logFile!.exists()) {
         await _logFile!.writeAsString('--- DukanSpace Diagnostics Reset ---\n');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Failed to reset log file: $e');
+    }
     logInfo('SYSTEM', 'Diagnostics logs cleared by user');
   }
 
@@ -156,7 +160,7 @@ class DiagnosticService {
     buffer.writeln('#             DUKANSPACE SYSTEM DIAGNOSTIC REPORT          #');
     buffer.writeln('############################################################');
     buffer.writeln('Generated At : $now');
-    buffer.writeln('App Version  : 1.0.0+1');
+    buffer.writeln('App Version  : 1.0.4+5');
     buffer.writeln('Platform     : ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
     buffer.writeln('Dart Runtime : ${kReleaseMode ? "Release Mode" : (kProfileMode ? "Profile Mode" : "Debug Mode")}');
     buffer.writeln('Locale       : ${Platform.localeName}');

@@ -41,9 +41,27 @@ jobs:
       - name: Step 2 - Code Formatting Verification
         run: dart format --output=none --line-length=120 .
 
-      - name: Step 3 - Static Analysis & Lints
-        run: flutter analyze --no-fatal-infos
+      - name: Step 3 - Static Analysis & Lint Report Generation
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos 2>&1 | tee flutter_analysis.txt
+          ANALYZER_EXIT=${PIPESTATUS[0]}
+          set -e
+          python3 tool/generate_ci_report.py flutter_analysis.txt analysis_report.md
+          if [ $ANALYZER_EXIT -ne 0 ]; then
+            echo "❌ Flutter analyzer found errors! See summary report above."
+            exit $ANALYZER_EXIT
+          fi
 
       - name: Step 4 - Unit & Logic Regression Tests
         run: flutter test
 
+      - name: Upload Quality & Audit Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-audit-reports
+          path: |
+            flutter_analysis.txt
+            analysis_report.md
+            verify_project_report.md

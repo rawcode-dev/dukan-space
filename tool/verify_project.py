@@ -222,28 +222,58 @@ def main():
     print("=" * 60)
 
     checks = [
-        check_dependencies,
-        check_security_and_permissions,
-        check_secrets_and_credentials,
-        check_sql_injection_safety,
-        check_code_hygiene,
+        ("Dependency Hygiene & Offline Allowlist", check_dependencies),
+        ("Android Permissions & Offline Architecture", check_security_and_permissions),
+        ("Secret, Key & Credential Scanning", check_secrets_and_credentials),
+        ("SQL Injection Vulnerability Check", check_sql_injection_safety),
+        ("Code Hygiene & Print Scanner", check_code_hygiene),
     ]
 
     all_passed = True
-    for check in checks:
-        if not check():
+    report_rows = []
+
+    for name, check_fn in checks:
+        passed = check_fn()
+        if not passed:
             all_passed = False
+        status_icon = "🟢 PASSED" if passed else "🔴 FAILED"
+        report_rows.append((name, status_icon))
         print()
 
     print("=" * 60)
     if all_passed:
         print("  🎉 ALL VERIFICATION CHECKS PASSED SUCCESSFULLY!")
         print("=" * 60)
-        sys.exit(0)
     else:
         print("  ❌ VERIFICATION CHECKS FAILED. PLEASE FIX THE ISSUES ABOVE.")
         print("=" * 60)
-        sys.exit(1)
+
+    # Write Markdown summary report
+    md = []
+    md.append("# 🛡️ DukanSpace Security & Pre-Validation Report")
+    md.append("")
+    overall_status = "🟢 **PASSED**" if all_passed else "🔴 **FAILED**"
+    md.append(f"> **Overall Security & Hygiene Status**: {overall_status}")
+    md.append("")
+    md.append("| Security / Architecture Gate | Status |")
+    md.append("| :--- | :--- |")
+    for name, stat in report_rows:
+        md.append(f"| {name} | {stat} |")
+    md.append("")
+
+    report_path = "verify_project_report.md"
+    with open(report_path, "w", encoding="utf-8") as rf:
+        rf.write("\n".join(md) + "\n")
+
+    github_summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if github_summary_path and os.path.exists(os.path.dirname(github_summary_path)):
+        try:
+            with open(github_summary_path, "a", encoding="utf-8") as ghs:
+                ghs.write("\n" + "\n".join(md) + "\n")
+        except Exception:
+            pass
+
+    sys.exit(0 if all_passed else 1)
 
 
 if __name__ == "__main__":

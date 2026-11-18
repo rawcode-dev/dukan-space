@@ -39,11 +39,30 @@ jobs:
       - name: Code Formatting Verification
         run: dart format --output=none --line-length=120 .
 
-      - name: Static Analysis
-        run: flutter analyze --no-fatal-infos
+      - name: Static Analysis & Lint Report Generation
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos 2>&1 | tee flutter_analysis.txt
+          ANALYZER_EXIT=${PIPESTATUS[0]}
+          set -e
+          python3 tool/generate_ci_report.py flutter_analysis.txt analysis_report.md
+          if [ $ANALYZER_EXIT -ne 0 ]; then
+            echo "❌ Flutter analyzer found errors! See summary report above."
+            exit $ANALYZER_EXIT
+          fi
 
       - name: Unit & Logic Tests
         run: flutter test
+
+      - name: Upload Quality & Audit Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-audit-reports
+          path: |
+            flutter_analysis.txt
+            analysis_report.md
+            verify_project_report.md
 
   build-apk:
     name: Build Android Release APK

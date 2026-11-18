@@ -95,7 +95,9 @@ class ExcelParserService {
     try {
       final dynamic inner = (val as dynamic).value;
       if (inner != null) return inner.toString().trim();
-    } catch (_) {}
+    } catch (_) {
+      // Value does not wrap an inner property; use outer string
+    }
     return val.toString().trim();
   }
 }

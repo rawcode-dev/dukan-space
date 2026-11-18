@@ -34,7 +34,9 @@ class DBProvider {
           await db.execute('PRAGMA synchronous = NORMAL;');
           await db.execute('PRAGMA cache_size = 2000;');
           await db.execute('PRAGMA temp_store = MEMORY;');
-        } catch (_) {}
+        } catch (e) {
+          DiagnosticService.instance.logInfo('Database', 'PRAGMA configuration notice: $e');
+        }
         DiagnosticService.instance.logInfo('Database', 'Database opened at version $_databaseVersion');
       },
       onCreate: (db, version) async {
@@ -46,7 +48,9 @@ class DBProvider {
           try {
             await db.execute("ALTER TABLE $tableInventory ADD COLUMN model_name TEXT DEFAULT ''");
             await db.execute("CREATE INDEX IF NOT EXISTS idx_inventory_model ON $tableInventory (model_name)");
-          } catch (_) {}
+          } catch (e) {
+            DiagnosticService.instance.logInfo('Database', 'Schema migration notice: $e');
+          }
         }
         await _createTables(db);
         DiagnosticService.instance.logInfo('Database', 'Database upgraded from $oldVersion to $newVersion');

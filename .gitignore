@@ -42,3 +42,8 @@ migrate_working_dir/
 # Coverage
 coverage/
 
+# Generated CI reports
+*_report.md
+*_analysis.txt
+
+
