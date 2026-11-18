@@ -51,6 +51,11 @@ jobs:
           echo "=== RAW FLUTTER ANALYZE OUTPUT ==="
           cat flutter_analysis.txt
           echo "==================================="
+          while IFS= read -r line; do
+            if [ -n "$line" ]; then
+              echo "::warning title=Analyzer Output::$line"
+            fi
+          done < flutter_analysis.txt
           python3 tool/generate_ci_report.py flutter_analysis.txt analysis_report.md
           if [ -n "$GITHUB_STEP_SUMMARY" ]; then
             cat analysis_report.md >> $GITHUB_STEP_SUMMARY
